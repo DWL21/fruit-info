@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>청량리 청과물시장 사진 검증 결과</title>
+  <style>
+    :root{--ink:#18231d;--muted:#667069;--line:#d7ded8;--ok:#18623b;--hold:#8b6519;--bg:#f3f5f2}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Pretendard","Apple SD Gothic Neo",sans-serif}main{max-width:1080px;margin:auto;padding:34px 20px 64px}header{border-bottom:2px solid var(--ok);padding-bottom:18px;margin-bottom:22px}h1{font-size:1.55rem;margin:0;letter-spacing:-.04em}p{margin:7px 0}.sub{color:var(--muted)}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 24px}.metric{background:#fff;border:1px solid var(--line);padding:14px}.metric b{font-size:1.45rem;display:block}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{background:#fff;border:1px solid var(--line);padding:14px}.card img{width:100%;height:225px;object-fit:cover;display:block;margin-bottom:12px}.tag{font-size:.77rem;font-weight:700;padding:3px 6px;display:inline-block}.ok{color:var(--ok);background:#eaf4ec}.hold{color:var(--hold);background:#fbf4e3}h2{font-size:1.08rem;margin:8px 0}table{border-collapse:collapse;width:100%;font-size:.88rem;margin-top:12px}td,th{padding:8px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f2f6f2}.note{margin-top:24px;padding:15px;background:#fff;border-left:3px solid var(--ok)}a{color:#185a38}@media(max-width:760px){.summary,.grid{grid-template-columns:1fr}.card img{height:auto}}
+  </style>
+</head>
+<body><main>
+  <header><h1>청량리 청과물시장 사진 검증 결과</h1><p class="sub">현재 세션의 이미지 이해로 판독한 PoC 결과 · 사진의 촬영 시각·GPS가 없어 당일 시세로는 게시하지 않음</p></header>
+  <section class="summary"><div class="metric"><b>3 / 3</b>점포 간판과 매대가 같은 사진에서 확인됨</div><div class="metric"><b>4건</b>점포·품목·가격을 함께 읽어 후보로 추출</div><div class="metric"><b>0건</b>촬영 시각이 없어 ‘현재 시세’로 자동 게시</div></section>
+  <section class="grid">
+    <article class="card"><img src="assets/poc-samples/cheongnyangni-sample-01.png" alt="북창상회 현장 사진"><span class="tag hold">게시 보류</span><h2>북창상회</h2><p class="sub">간판은 분명하지만, 보이는 가격표의 품목명이 가려지거나 매대와의 연결이 불명확합니다.</p><table><tr><th>판독 내용</th><th>검증</th></tr><tr><td>10개 5,000원, 3개 20,000원 등 가격표</td><td>가격·단위 일부만 읽힘. 품목 연결 불가</td></tr></table></article>
+    <article class="card"><img src="assets/poc-samples/cheongnyangni-sample-02.png" alt="화승청과 현장 사진"><span class="tag ok">후보 통과</span><h2>화승청과</h2><p class="sub">점포 간판과 포도 매대, 가격표가 같은 프레임에 있어 귀속을 확인할 수 있습니다.</p><table><tr><th>품목</th><th>가격</th></tr><tr><td>하우스 포도<br><span class="sub">세부 품종 표기는 불명확</span></td><td>6,000원</td></tr></table></article>
+    <article class="card"><img src="assets/poc-samples/cheongnyangni-sample-03.png" alt="한농상회 현장 사진"><span class="tag ok">사진 매칭 통과</span><h2>한농상회</h2><p class="sub">간판, 감귤류 매대, 개별 가격표가 같은 프레임에 있습니다. 각 가격표는 좌·중앙·우측 바로 뒤의 매대와 대응합니다.</p><table><tr><th>품목 표기와 매대</th><th>가격·단위</th></tr><tr><td>하우스 경봉<br><span class="sub">좌측 상자 매대</span></td><td>1판 3,000원</td></tr><tr><td>하우스 귤<br><span class="sub">중앙 상자 매대</span></td><td>6,000원</td></tr><tr><td>하우스 감귤<br><span class="sub">우측 상자 매대</span></td><td>5,000원</td></tr></table><p class="sub">판정: 점포·품목·가격 매칭은 통과. 촬영 시각·시장 구역이 없어 현재 시세 게시에는 보류.</p></article>
+  </section>
+  <section class="note"><strong>검증 규칙</strong><br>점포 간판, 품목, 가격표가 한 사진에서 서로 대응되고 가격·단위가 읽히는 경우에만 후보로 저장합니다. 촬영 시각·점포 위치·두 번째 독립 제보 중 하나가 빠지면 ‘현재 시세’가 아니라 ‘검증 대기 관측값’으로 표시합니다. 상용 모델 대안으로는 객체 분할용 SAM이 아니라 이미지 이해 모델인 Cloudflare Workers AI Llama 4 Scout를 별도 비교한다. <a href="poc.html">현장 관측 PoC 열기</a></section>
+</main></body></html>
