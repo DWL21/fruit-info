@@ -9,6 +9,6 @@
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "eval": "echo eval 준비 중"
+    "eval": "pnpm --filter @fruit/api eval"
   }
 }
