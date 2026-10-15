@@ -46,3 +46,34 @@ export function walkKey(s: { aisle: AisleId; position: number; side: SideId }): 
   const v = MARKET.verticals.find((x) => x.id === s.aisle);
   return (v?.from ?? 0) * 10 + 1 + s.position / 100 + (s.side === 'A' ? 0 : 0.005);
 }
+
+/**
+ * 걷는 순서 안내도의 구간(본통로 시작 지점 m). 같은 건물 주소끼리 묶이도록 나눴다.
+ * 세로줄은 본통로에서 갈라지는 지점(from)이 속한 구간에 들어간다.
+ */
+export const SEGMENT_STARTS = [0, 20, 86, 125, 170, 210];
+
+export function segmentIndex(s: { aisle: AisleId; position: number }): number {
+  const at = s.aisle === 'main' ? s.position : (MARKET.verticals.find((v) => v.id === s.aisle)?.from ?? 0);
+  let i = 0;
+  while (i + 1 < SEGMENT_STARTS.length && at >= SEGMENT_STARTS[i + 1]!) i++;
+  return i;
+}
+
+/** 구간 끝(m) */
+export const segmentEnd = (i: number) => SEGMENT_STARTS[i + 1] ?? MARKET.length;
+
+/** '왕산로33길 17', '왕산로33길 13' → '왕산로33길 13·17'. 길은 처음 나온 순서, 번지는 숫자 순서. */
+export function compactAddresses(addresses: (string | null | undefined)[]): string {
+  const roads = new Map<string, string[]>();
+  for (const a of addresses) {
+    if (!a) continue;
+    const cut = a.lastIndexOf(' ');
+    const road = cut > 0 ? a.slice(0, cut) : a;
+    const no = cut > 0 ? a.slice(cut + 1) : '';
+    const list = roads.get(road) ?? [];
+    if (no && !list.includes(no)) list.push(no);
+    roads.set(road, list);
+  }
+  return [...roads].map(([road, nos]) => [road, nos.sort((a, b) => a.localeCompare(b, 'ko', { numeric: true })).join('·')].filter(Boolean).join(' ')).join(', ');
+}
