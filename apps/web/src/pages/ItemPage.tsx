@@ -11,12 +11,10 @@ export function ItemPage({ slug }: { slug: string }) {
   const detail = useQuery({ queryKey: ['item', slug], queryFn: () => api.item(slug) });
   const stores = useQuery({ queryKey: ['stores'], queryFn: api.stores });
 
+  // 가게 번호: 가격 오름차순으로 처음 나온 순서. 지도 칸과 가격 카드에 같은 번호를 쓴다.
   const marks = useMemo(() => {
     const m = new Map<number, StallMark>();
-    const obs = detail.data?.observations ?? [];
-    for (const o of obs) if (!m.has(o.storeId)) m.set(o.storeId, { price: o.price, unit: o.unit }); // 가격 오름차순
-    const first = obs[0];
-    if (first) m.set(first.storeId, { ...m.get(first.storeId)!, cheapest: true });
+    for (const o of detail.data?.observations ?? []) if (!m.has(o.storeId)) m.set(o.storeId, { label: String(m.size + 1), best: m.size === 0 });
     return m;
   }, [detail.data]);
 
@@ -54,7 +52,7 @@ export function ItemPage({ slug }: { slug: string }) {
             <ul className="mt-2 space-y-3">
               {observations.map((o, i) => (
                 <li key={o.id}>
-                  <PriceCard o={o} rank={i} />
+                  <PriceCard o={o} rank={Number(marks.get(o.storeId)?.label ?? i + 1)} />
                 </li>
               ))}
             </ul>

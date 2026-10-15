@@ -10,8 +10,8 @@ export function FreshBadge({ at }: { at: string }) {
   );
 }
 
-export const placeLabel = (o: Pick<Observation, 'storeAisle' | 'storePosition' | 'storeSide'>) =>
-  placeName({ aisle: o.storeAisle, position: o.storePosition, side: o.storeSide });
+export const placeLabel = (o: Pick<Observation, 'storeAisle' | 'storePosition' | 'storeSide' | 'storeAddress'>) =>
+  [placeName({ aisle: o.storeAisle, position: o.storePosition, side: o.storeSide }), o.storeAddress].filter(Boolean).join(' · ');
 
 /** 시세 한 건: 진열 상품과 가격표가 함께 보이는 크롭 사진이 핵심이다. */
 export function PriceCard({ o, rank, showStore = true, title }: { o: Observation; rank?: number; showStore?: boolean; title?: string }) {
@@ -24,8 +24,9 @@ export function PriceCard({ o, rank, showStore = true, title }: { o: Observation
           <div className="flex aspect-[4/3] items-center justify-center text-sm text-sky">사진 위치 정보 없음 · 원본 보기</div>
         )}
         {rank !== undefined && (
-          <span className={`absolute left-2 top-2 px-2 py-1 text-xs font-bold ${rank === 0 ? 'btn-signal' : 'btn-carbon rounded-[2px]'}`}>
-            {rank === 0 ? '최저가' : `${rank + 1}위`}
+          <span className={`absolute left-2 top-2 flex items-center gap-1 px-2 py-1 text-xs font-black ${rank === 1 ? 'btn-signal' : 'rounded-[2px] border border-chrome bg-white text-carbon'}`}>
+            {rank}
+            {rank === 1 && <span className="font-bold">최저가</span>}
           </span>
         )}
         <span className="carbon absolute bottom-2 right-2 rounded-[2px] px-1.5 py-0.5 text-[11px] font-bold">원본 보기 ›</span>
