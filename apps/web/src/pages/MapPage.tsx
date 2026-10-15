@@ -26,7 +26,7 @@ export function MapPage() {
                   <Link href={`/store/${s.id}`} className="flex min-h-12 items-center justify-between gap-2 px-3 py-2">
                     <span className="min-w-0">
                       <span className="block truncate font-bold">{s.name}</span>
-                      <span className="block text-xs font-bold text-chrome">{placeName(s)}</span>
+                      <span className="block text-xs font-bold text-chrome">{[placeName(s), s.address].filter(Boolean).join(' · ')}</span>
                     </span>
                     <span className="shrink-0 text-right text-xs font-bold text-chrome">
                       {s.itemCount ? `과일 ${s.itemCount}` : '—'}

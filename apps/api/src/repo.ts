@@ -6,7 +6,7 @@ const parseBox = (s: string | null): Box | null => (s ? (JSON.parse(s) as Box) :
 const since = () => new Date(Date.now() - VISIBLE_DAYS * 86400_000).toISOString();
 
 interface ObsRow {
-  id: number; item_slug: string; store_id: number; store_name: string; aisle: Aisle; position: number; side: 'A' | 'B';
+  id: number; item_slug: string; store_id: number; store_name: string; aisle: Aisle; position: number; side: 'A' | 'B'; address: string | null;
   raw_name: string; variety: string | null; price: number; unit: string | null; confidence: number;
   photo_id: string; crop: number; price_box: string | null; product_box: string | null; observed_at: string;
 }
@@ -19,6 +19,7 @@ const toObservation = (r: ObsRow): Observation => ({
   storeAisle: r.aisle,
   storePosition: r.position,
   storeSide: r.side,
+  storeAddress: r.address,
   rawName: r.raw_name,
   variety: r.variety,
   price: r.price,
@@ -53,7 +54,7 @@ const CURRENT_SQL = `
       PARTITION BY c.store_id, c.item_slug, IFNULL(c.variety,''), c.price, IFNULL(c.unit,'') ORDER BY c.observed_at DESC, c.id DESC
     ) AS rn FROM current c
   )
-  SELECT d.id, d.item_slug, d.store_id, s.name AS store_name, s.aisle, s.position, s.side, d.raw_name, d.variety, d.price, d.unit,
+  SELECT d.id, d.item_slug, d.store_id, s.name AS store_name, s.aisle, s.position, s.side, s.address, d.raw_name, d.variety, d.price, d.unit,
          d.confidence, d.photo_id, d.crop, d.price_box, d.product_box, d.observed_at
   FROM dedup d JOIN stores s ON s.id = d.store_id
   WHERE d.rn = 1 AND s.active = 1`;
@@ -89,21 +90,21 @@ export function itemSummaries(): ItemSummary[] {
   return out.sort((a, b) => b.storeCount - a.storeCount || b.lastObservedAt.localeCompare(a.lastObservedAt));
 }
 
-interface StoreRow { id: number; name: string; aisle: Aisle; position: number; side: 'A' | 'B'; note: string | null; last_photo_at: string | null }
+interface StoreRow { id: number; name: string; aisle: Aisle; position: number; side: 'A' | 'B'; address: string | null; note: string | null; last_photo_at: string | null }
 
 export function listStores(): Store[] {
   const counts = new Map<number, number>();
   for (const o of currentObservations()) counts.set(o.storeId, (counts.get(o.storeId) ?? 0) + 1);
   const rows = db
     .prepare(
-      `SELECT s.id, s.name, s.aisle, s.position, s.side, s.note,
+      `SELECT s.id, s.name, s.aisle, s.position, s.side, s.address, s.note,
               (SELECT MAX(taken_at) FROM photos p WHERE p.store_id = s.id AND p.status = 'done') AS last_photo_at
        FROM stores s WHERE s.active = 1`,
     )
     .all() as StoreRow[];
   return rows
     .map((r) => ({
-      id: r.id, name: r.name, aisle: r.aisle, position: r.position, side: r.side, note: r.note,
+      id: r.id, name: r.name, aisle: r.aisle, position: r.position, side: r.side, address: r.address, note: r.note,
       itemCount: counts.get(r.id) ?? 0, lastPhotoAt: r.last_photo_at,
     }))
     .sort((a, b) => walkKey(a) - walkKey(b));
@@ -142,7 +143,7 @@ export function listPhotos(opts: { storeId?: number; status?: 'done'; limit?: nu
 export function photoObservations(photoId: string): Observation[] {
   const rows = db
     .prepare(
-      `SELECT o.id, o.item_slug, o.store_id, s.name AS store_name, s.aisle, s.position, s.side, o.raw_name, o.variety, o.price, o.unit,
+      `SELECT o.id, o.item_slug, o.store_id, s.name AS store_name, s.aisle, s.position, s.side, s.address, o.raw_name, o.variety, o.price, o.unit,
               o.confidence, o.photo_id, o.crop, o.price_box, o.product_box, o.observed_at
        FROM observations o JOIN stores s ON s.id = o.store_id WHERE o.photo_id = ? AND o.hidden = 0 ORDER BY o.id`,
     )

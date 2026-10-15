@@ -10,8 +10,8 @@ export function FreshBadge({ at }: { at: string }) {
   );
 }
 
-export const placeLabel = (o: Pick<Observation, 'storeAisle' | 'storePosition' | 'storeSide'>) =>
-  placeName({ aisle: o.storeAisle, position: o.storePosition, side: o.storeSide });
+export const placeLabel = (o: Pick<Observation, 'storeAisle' | 'storePosition' | 'storeSide' | 'storeAddress'>) =>
+  [placeName({ aisle: o.storeAisle, position: o.storePosition, side: o.storeSide }), o.storeAddress].filter(Boolean).join(' · ');
 
 /** 시세 한 건: 진열 상품과 가격표가 함께 보이는 크롭 사진이 핵심이다. */
 export function PriceCard({ o, rank, showStore = true, title }: { o: Observation; rank?: number; showStore?: boolean; title?: string }) {

@@ -42,6 +42,7 @@ export const Store = z.object({
   /** 통로 안에서의 순번 (1부터, market.ts 참고) */
   position: z.number(),
   side: Side,
+  address: z.string().nullable(),
   note: z.string().nullable(),
   itemCount: z.number(),
   lastPhotoAt: z.string().nullable(),
@@ -51,8 +52,9 @@ export type Store = z.infer<typeof Store>;
 export const StoreInput = z.object({
   name: z.string().trim().min(1, '가게 이름을 입력하세요').max(40),
   aisle: Aisle,
-  position: z.number().int().min(1).max(500),
+  position: z.number().int().min(0).max(500),
   side: Side,
+  address: z.string().trim().max(60).nullable().optional(),
   note: z.string().trim().max(80).nullable().optional(),
 });
 export type StoreInput = z.infer<typeof StoreInput>;
@@ -65,6 +67,7 @@ export const Observation = z.object({
   storeAisle: Aisle,
   storePosition: z.number(),
   storeSide: Side,
+  storeAddress: z.string().nullable(),
   rawName: z.string(),
   variety: z.string().nullable(),
   price: z.number(),

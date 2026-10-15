@@ -260,8 +260,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; currentId?: number; onPick: (index: number) => void; onClose: () => void }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Store | null>(null);
-  const nextPos = Math.max(0, ...stores.filter((s) => s.aisle === 'main').map((s) => s.position));
-  const [form, setForm] = useState({ name: '', aisle: 'main' as Aisle, position: nextPos + 1, side: 'A' as Side });
+  const [form, setForm] = useState({ name: '', aisle: 'main' as Aisle, position: 0, side: 'A' as Side });
   useEffect(() => {
     if (editing) setForm({ name: editing.name, aisle: editing.aisle, position: editing.position, side: editing.side });
   }, [editing]);
@@ -270,7 +269,7 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['stores'] });
       setEditing(null);
-      setForm((f) => ({ name: '', aisle: f.aisle, position: f.side === 'B' ? f.position + 1 : f.position, side: f.side === 'A' ? 'B' : 'A' }));
+      setForm((f) => ({ ...f, name: '' }));
     },
   });
   const remove = useMutation({
@@ -318,8 +317,8 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
         </fieldset>
         <div className="flex gap-3">
           <label className="block flex-1 text-sm">
-            몇 번째
-            <input type="number" min={1} value={form.position} onChange={(e) => setForm({ ...form, position: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-chrome px-3" />
+            {form.aisle === 'main' ? '제기동역 끝에서 (m)' : '본통로부터 순번'}
+            <input type="number" min={0} value={form.position} onChange={(e) => setForm({ ...form, position: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-chrome px-3" />
           </label>
           <fieldset className="flex-1 text-sm">
             <legend>위치</legend>

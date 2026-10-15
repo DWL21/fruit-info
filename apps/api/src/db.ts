@@ -56,6 +56,11 @@ const migrations: string[] = [
    );
    CREATE INDEX obs_item ON observations(item_slug, observed_at);
    CREATE INDEX obs_store ON observations(store_id, observed_at);`,
+  `ALTER TABLE stores ADD COLUMN address TEXT;
+   ALTER TABLE stores ADD COLUMN kakao_id TEXT;
+   ALTER TABLE stores ADD COLUMN lat REAL;
+   ALTER TABLE stores ADD COLUMN lon REAL;
+   CREATE UNIQUE INDEX stores_kakao ON stores(kakao_id) WHERE kakao_id IS NOT NULL;`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (id INTEGER PRIMARY KEY)');
