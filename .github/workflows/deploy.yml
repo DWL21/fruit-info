@@ -22,9 +22,11 @@ jobs:
         env:
           PATH: /home/ubuntu/.local/node/bin:/usr/local/bin:/usr/bin:/bin
           VITE_API_URL: https://fruit-api.simplyimg.com
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
         run: |
-          corepack enable --install-directory /tmp/corepack-bin
-          export PATH=/tmp/corepack-bin:$PATH
+          mkdir -p "$RUNNER_TEMP/corepack-bin"
+          corepack enable --install-directory "$RUNNER_TEMP/corepack-bin"
+          export PATH="$RUNNER_TEMP/corepack-bin:$PATH"
           pnpm install --frozen-lockfile --filter @fruit/web...
           pnpm --filter @fruit/web build
           cd apps/web && npx --yes wrangler@4.151.0 pages deploy dist --project-name fruit-info --branch main --commit-hash "$GITHUB_SHA"
