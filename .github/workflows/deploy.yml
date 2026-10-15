@@ -1,0 +1,34 @@
+name: Production deployment
+# 퍼블릭 저장소: self-hosted runner는 main 푸시와 수동 실행에서만 쓴다. (pull_request 금지)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fruit-info-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, x64, fruit-info-production]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Deploy API server
+        run: bash scripts/deploy-production.sh
+      - name: Build and deploy web (Cloudflare Pages)
+        env:
+          PATH: /home/ubuntu/.local/node/bin:/usr/local/bin:/usr/bin:/bin
+          VITE_API_URL: https://fruit-api.simplyimg.com
+        run: |
+          corepack enable --install-directory /tmp/corepack-bin
+          export PATH=/tmp/corepack-bin:$PATH
+          pnpm install --frozen-lockfile --filter @fruit/web...
+          pnpm --filter @fruit/web build
+          cd apps/web && npx --yes wrangler@4.151.0 pages deploy dist --project-name fruit-info --branch main --commit-hash "$GITHUB_SHA"
+      - name: Verify public deployment
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors https://fruit-api.simplyimg.com/api/health
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors https://fruit.simplyimg.com/ -o /dev/null
