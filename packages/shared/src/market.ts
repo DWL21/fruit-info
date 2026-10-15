@@ -1,7 +1,7 @@
 /**
  * 청량리 청과물시장 고정 배치.
  * 가로 본통로가 왼쪽(제기동역)에서 오른쪽(청량리역)으로 이어지고, 중간에 세로 통로 2개가 있다.
- * 순번은 본통로는 제기동역 쪽부터, 세로 통로는 본통로에서 멀어지는 방향으로 1부터 센다.
+ * 순번: 본통로는 제기동역 쪽부터 1, 세로 통로는 북쪽 끝부터 1 (본통로 위쪽 up개, 아래쪽 down개).
  */
 export type AisleId = 'main' | 'v1' | 'v2';
 export type SideId = 'A' | 'B';
@@ -9,10 +9,12 @@ export type SideId = 'A' | 'B';
 export interface VerticalAisle {
   id: Exclude<AisleId, 'main'>;
   name: string;
-  /** 본통로 몇 번째 가판대 다음에서 갈라지는지 */
+  /** 본통로 몇 번째 가판대 다음에서 가로지르는지 */
   after: number;
-  direction: 'up' | 'down';
-  length: number;
+  /** 본통로 위쪽(북쪽)으로 이어지는 가판대 수 */
+  up: number;
+  /** 본통로 아래쪽(왕산로 쪽)으로 이어지는 가판대 수 */
+  down: number;
 }
 
 export const MARKET = {
@@ -20,8 +22,8 @@ export const MARKET = {
   east: '청량리역',
   mainLength: 16,
   verticals: [
-    { id: 'v1', name: '세로 통로 1', after: 5, direction: 'down', length: 6 },
-    { id: 'v2', name: '세로 통로 2', after: 11, direction: 'down', length: 6 },
+    { id: 'v1', name: '세로 통로 1', after: 5, up: 3, down: 2 },
+    { id: 'v2', name: '세로 통로 2', after: 11, up: 3, down: 2 },
   ] as VerticalAisle[],
 };
 
