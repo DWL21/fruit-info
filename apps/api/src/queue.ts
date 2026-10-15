@@ -5,6 +5,7 @@ import { live } from './live.ts';
 import { cropBox, makeCrop, originalPath, publishPhoto } from './media.ts';
 import { getPhoto } from './repo.ts';
 import { config } from './config.ts';
+import { capture } from './monitor.ts';
 
 let running = 0;
 
@@ -65,6 +66,7 @@ async function processOne(): Promise<boolean> {
     // 두 번까지 다시 시도한다.
     db.prepare(`UPDATE photos SET status = ?, error = ? WHERE id = ?`).run(attempts < 3 ? 'queued' : 'failed', message.slice(0, 300), next.id);
     console.error(`[analyze] ${next.id} 실패 (${attempts}회):`, message);
+    if (attempts >= 3) capture(error, { photoId: next.id });
   }
   emitPhoto(next.id);
   return true;

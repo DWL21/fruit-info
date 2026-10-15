@@ -22,6 +22,12 @@ jobs:
         env:
           PATH: /home/ubuntu/.local/node/bin:/usr/local/bin:/usr/bin:/bin
           VITE_API_URL: https://fruit-api.simplyimg.com
+          # 공개 클라이언트 ID만 저장소 변수(vars)로 주입한다. 없으면 해당 도구는 로드되지 않는다.
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST }}
+          VITE_GA_ID: ${{ vars.VITE_GA_ID }}
+          VITE_CLARITY_ID: ${{ vars.VITE_CLARITY_ID }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
         run: |
           mkdir -p "$RUNNER_TEMP/corepack-bin"

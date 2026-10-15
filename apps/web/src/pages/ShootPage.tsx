@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AISLES, CATALOG, placeName, sideName, timeAgo, won, type Aisle, type Photo, type Side, type Store } from '@fruit/shared';
 import { adminApi, api, operatorKey } from '../lib/api.ts';
 import { Link } from '../components/Link.tsx';
+import { track } from '../lib/analytics.ts';
 
 /** 촬영 결과를 최대 2560px JPEG로 만든다. 캔버스를 거치며 EXIF(GPS 등)가 제거된다. */
 async function toJpeg(source: CanvasImageSource, w: number, h: number): Promise<Blob> {
@@ -135,6 +136,7 @@ function Shooter() {
     setTimeout(() => setFlash(false), 120);
     navigator.vibrate?.(30);
     enqueue(await toJpeg(v, v.videoWidth, v.videoHeight), new Date().toISOString());
+    track('shoot_capture', { store_id: current.id, source: 'camera' });
     if (auto) go(idx + 1);
   };
 
@@ -159,10 +161,11 @@ function Shooter() {
     adminApi
       .upload(job.blob, job.storeId, job.takenAt)
       .then(() => {
+        track('upload_done', { store_id: job.storeId });
         setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'sent' } : j)));
         void qc.invalidateQueries({ queryKey: ['admin-photos'] });
       })
-      .catch((e: Error) => setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'error', error: e.message } : j))))
+      .catch((e: Error) => (track('upload_failed', { store_id: job.storeId }), setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'error', error: e.message } : j)))))
       .finally(() => {
         busy.current = false;
         setJobs((js) => [...js]);

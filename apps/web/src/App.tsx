@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Layout } from './components/Layout.tsx';
+import { trackPage } from './lib/analytics.ts';
 import { match, useLocation } from './lib/router.ts';
 import { HomePage } from './pages/HomePage.tsx';
 import { ItemPage } from './pages/ItemPage.tsx';
@@ -10,6 +12,7 @@ import { NotFound } from './components/States.tsx';
 
 export function App() {
   const location = useLocation();
+  useEffect(() => trackPage(location), [location]);
   const path = location.split('?')[0]!;
   if (path === '/shoot') return <ShootPage />;
 
