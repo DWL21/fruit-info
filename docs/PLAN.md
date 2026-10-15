@@ -6,6 +6,14 @@
 
 청량리 청과물시장 매대를 **찍으면 바로** 점포별 과일 가격이 올라가는, 모바일 웹 실시간 시세판.
 
+## 1-1. 사용자가 필요로 하는 것 (최우선)
+
+> **어느 위치(가게)에서 어느 과일을 얼마에 파는지** — 직접 가지 않고도, 진열 사진과 가격표 사진으로 정확하게.
+
+- 공급: 운영자 1명이 통로를 따라 가게 순서대로 셔터만 누르면 자동 분석·자동 게시된다.
+- 시장 구조: 한 줄 통로 양쪽에 가판대. 지도는 이 통로 모양으로 보여준다.
+- 모든 기능은 위 문장을 더 정확하고 빠르게 맞추는지로 우선순위를 정한다.
+
 ## 2. 문제 (Problem)
 
 | 누가 | 무엇이 불편한가 | 지금은 어떻게 하나 | 왜 부족한가 |
@@ -30,9 +38,10 @@
 
 ## 4. 해결책 (MVP 범위)
 
-1. **찍기 → 분석 → 한 번에 등록** — 카메라로 매대 촬영, 서버가 비전 AI로 품목·가격·단위·점포명을 추출, 사용자는 체크된 후보를 확인만 하고 등록.
+1. **운영자 촬영 모드** — 가게 순서대로 자동 선택, 셔터만 누르면 업로드. 서버가 Codex(gpt-6.1-sol)로 품목·가격·단위·가격표/상품 위치를 추출해 자동 게시, 얼굴은 블러.
 2. **실시간 시세판** — 품목별 최저가·평균·점포 수, 새 시세가 올라오면 SSE로 즉시 반영.
-3. **품목 상세** — 점포별 가격 오름차순, 관측 시각·사진 근거·신뢰도 배지.
+3. **과일 상세** — 가게별 가격 오름차순, 각 항목에 진열 상품+가격표 크롭 사진, 원본에 위치 표시.
+3-1. **시장 지도** — 통로 양쪽 가판대 모양, 과일을 고르면 가게별 가격이 지도에 표시.
 4. **점포 상세** — 점포가 파는 품목과 최근 사진.
 5. **신뢰 규칙** — 4시간 지나면 "확인 필요", 24시간 지나면 기본 목록에서 제외, 서로 다른 제보 2건 일치 시 "확인됨".
 
@@ -48,7 +57,7 @@
 | 해결책 | 사진 한 장 시세 제보 + 실시간 점포별 시세판 |
 | 채널 | 시장 입구 QR 스티커, 지역 맘카페·당근 동네생활, 상인 매대 QR |
 | 수익 | (후순위) 상인 프로모션 노출, 소상공인 시세 리포트 구독, 지자체 전통시장 활성화 사업 |
-| 비용 | 비전 AI 호출(Workers AI 무료 할당량 우선), 서버 1대, 도메인 |
+| 비용 | 사진 분석(서버의 Codex 구독 사용), 서버 1대, 도메인 |
 | 핵심 지표 | North Star + H1~H3 지표 |
 | 경쟁우위 | 사진 근거가 붙은 점포 단위 시세 데이터의 누적 |
 
@@ -56,23 +65,23 @@
 
 ```
 [모바일 브라우저]
-   │  https://fruit.simplyimg.com   (Cloudflare Workers Static Assets, React SPA)
+   │  https://fruit.simplyimg.com   (Cloudflare Pages, React SPA)
    │  https://fruit-api.simplyimg.com (Cloudflare Tunnel → pahidc 서버)
    ▼
-[pahidc] nginx gateway :8081 ─▶ api (Hono · Node 22 · SQLite/Drizzle · 사진 볼륨)
-                                   │  Bearer 시크릿
+[pahidc] nginx gateway :8081 ─▶ api (Hono · Node 22 · SQLite · 사진 볼륨)
+                                   │  분석 큐 (동시 2)
                                    ▼
-                       [fruit-vision Worker] ─▶ Workers AI (Llama 4 Scout, 비전 + JSON)
+                       codex exec -m gpt-6.1-sol --output-schema (도구 비활성화, 읽기 전용)
 ```
 
 | 영역 | 선택 | 이유 |
 |---|---|---|
 | 프론트 | Vite 7 · React 19 · TypeScript · Tailwind CSS v4 · TanStack Query | 빠른 빌드, 모바일 SPA, 정적 배포 |
 | 백엔드 | Hono 4 · Node 22 · TypeScript · Zod | 가볍고 타입 안전, Web 표준 API |
-| DB | SQLite (better-sqlite3) + Drizzle ORM | 서버 1대·저부하에 최적, 백업 쉬움. 성장 시 Postgres로 이전 |
-| AI | Cloudflare Workers AI `@cf/meta/llama-4-scout-17b-16e-instruct` (전용 Worker 경유), OpenAI 키가 있으면 교체 가능 | 별도 API 키 없이 계정 권한으로 사용, 무료 할당량 |
+| DB | SQLite (better-sqlite3, WAL, SQL 마이그레이션) | 서버 1대·저부하에 최적, 백업 쉬움. 성장 시 Postgres로 이전 |
+| AI | Codex CLI `gpt-6.1-sol` (서버 로그인 계정, 도구 전부 비활성화) | 비교 모델 중 가장 정확(가게명·가격·좌표), 추가 API 키 불필요. 근거: `decisions/0001` |
 | 실시간 | Server-Sent Events | 단방향 시세 푸시에 충분, 프록시 친화적 |
-| 배포 | GitHub Actions self-hosted runner(pahidc) → docker compose, wrangler로 Worker 배포 | main 머지 = 자동 배포 |
+| 배포 | GitHub Actions self-hosted runner(pahidc) → docker compose, wrangler pages deploy | main 머지 = 자동 배포 |
 
 ### 데이터 모델
 

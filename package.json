@@ -1,0 +1,14 @@
+{
+  "name": "fruit-info",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @fruit/api --filter @fruit/web dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present test",
+    "build": "pnpm -r --if-present build",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "eval": "echo eval 준비 중"
+  }
+}
