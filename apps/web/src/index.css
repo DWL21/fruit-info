@@ -23,6 +23,7 @@
 }
 
 html { -webkit-tap-highlight-color: transparent; }
+:root { --header-h: 88px; }
 
 body {
   margin: 0;

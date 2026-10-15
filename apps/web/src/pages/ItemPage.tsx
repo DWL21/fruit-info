@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { won } from '@fruit/shared';
 import { api } from '../lib/api.ts';
-import { AisleMap, type StallMark } from '../components/AisleMap.tsx';
+import { WalkGuide, type GuideMark } from '../components/WalkGuide.tsx';
 import { PriceCard } from '../components/PriceCard.tsx';
 import { Empty, ErrorBox, Loading, SectionTitle } from '../components/States.tsx';
 import { Link } from '../components/Link.tsx';
@@ -11,10 +11,11 @@ export function ItemPage({ slug }: { slug: string }) {
   const detail = useQuery({ queryKey: ['item', slug], queryFn: () => api.item(slug) });
   const stores = useQuery({ queryKey: ['stores'], queryFn: api.stores });
 
-  // 가게 번호: 가격 오름차순으로 처음 나온 순서. 지도 칸과 가격 카드에 같은 번호를 쓴다.
+  // 가게 번호: 가격 오름차순으로 처음 나온 순서. 안내도 칸과 가격 카드에 같은 번호를 쓴다.
   const marks = useMemo(() => {
-    const m = new Map<number, StallMark>();
-    for (const o of detail.data?.observations ?? []) if (!m.has(o.storeId)) m.set(o.storeId, { label: String(m.size + 1), best: m.size === 0 });
+    const m = new Map<number, GuideMark>();
+    for (const o of detail.data?.observations ?? [])
+      if (!m.has(o.storeId)) m.set(o.storeId, { label: String(m.size + 1), best: m.size === 0, price: o.price, unit: o.unit, target: `price-${o.storeId}` });
     return m;
   }, [detail.data]);
 
@@ -44,14 +45,14 @@ export function ItemPage({ slug }: { slug: string }) {
           {stores.data && (
             <section aria-labelledby="map-title">
               <SectionTitle id="map-title">위치</SectionTitle>
-              <AisleMap stores={stores.data} marks={marks} />
+              <WalkGuide stores={stores.data} marks={marks} />
             </section>
           )}
           <section aria-labelledby="list-title">
             <SectionTitle id="list-title">가게별 가격</SectionTitle>
             <ul className="mt-2 space-y-3">
               {observations.map((o, i) => (
-                <li key={o.id}>
+                <li key={o.id} id={observations.findIndex((x) => x.storeId === o.storeId) === i ? `price-${o.storeId}` : undefined} className="scroll-mt-[calc(var(--header-h)+8px)]">
                   <PriceCard o={o} rank={Number(marks.get(o.storeId)?.label ?? i + 1)} />
                 </li>
               ))}

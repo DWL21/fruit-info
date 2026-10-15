@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { CATALOG, placeName, timeAgo } from '@fruit/shared';
+import { CATALOG, placeName, segmentIndex, timeAgo } from '@fruit/shared';
 import { api } from '../lib/api.ts';
-import { AisleMap } from '../components/AisleMap.tsx';
+import { MiniMap } from '../components/MiniMap.tsx';
+import { navigate } from '../lib/router.ts';
 import { PriceCard } from '../components/PriceCard.tsx';
 import { Empty, ErrorBox, Loading, SectionTitle } from '../components/States.tsx';
 import { Link } from '../components/Link.tsx';
@@ -18,15 +19,15 @@ export function StorePage({ id }: { id: number }) {
   return (
     <div className="space-y-5">
       <div>
-        <Link href="/map" className="text-sm font-bold text-carbon">‹ 시장 지도</Link>
+        <Link href={`/map?seg=${segmentIndex(store) + 1}`} className="text-sm font-bold text-carbon">‹ 시장 지도</Link>
         <h1 className="display-outline mt-1 text-[28px]">{store.name}</h1>
         <p className="mt-1 text-sm font-bold text-carbon">
-          {[placeName(store), store.address].filter(Boolean).join(' · ')}
+          {[`구간 ${segmentIndex(store) + 1}`, placeName(store), store.address].filter(Boolean).join(' · ')}
           {store.note && ` · ${store.note}`}
         </p>
         {store.lastPhotoAt && <p className="text-xs font-bold text-chrome">마지막 촬영 {timeAgo(store.lastPhotoAt)}</p>}
       </div>
-      {stores.data && <AisleMap stores={stores.data} highlight={store.id} />}
+      {stores.data && <MiniMap stores={stores.data} highlight={store.id} active={segmentIndex(store)} onPick={(i) => navigate(`/map?seg=${i + 1}`)} />}
       <section>
         <SectionTitle>과일</SectionTitle>
         {sorted.length ? (

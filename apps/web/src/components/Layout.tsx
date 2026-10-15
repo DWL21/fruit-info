@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Link } from './Link.tsx';
 import { useLiveUpdates } from '../lib/live.ts';
 
@@ -9,9 +9,18 @@ const tabs = [
 
 export function Layout({ path, children }: { path: string; children: ReactNode }) {
   const connected = useLiveUpdates();
+  const header = useRef<HTMLElement>(null);
+  // 고정 헤더 높이를 --header-h로 알려 지도 미니맵·스크롤 기준에 쓴다.
+  useLayoutEffect(() => {
+    const el = header.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
     <div className="mx-auto min-h-dvh max-w-2xl pb-10">
-      <header className="sticky top-0 z-20 shadow-[0_2px_0_var(--color-chrome)]">
+      <header ref={header} className="sticky top-0 z-20 shadow-[0_2px_0_var(--color-chrome)]">
         <div className="carbon flex items-center justify-between gap-2 px-3 py-2">
           <Link href="/" className="flex items-center gap-2 rounded-full bg-white px-3 py-1 shadow-[inset_0_-2px_0_rgb(0_0_0/0.15)]">
             <img src="/icon.svg" alt="" className="size-6" />
