@@ -57,7 +57,7 @@ export function AisleMap({ stores, marks, highlight }: { stores: Store[]; marks?
     );
 
   const stall = (s: Store | undefined) => {
-    if (!s) return <div className="h-full min-h-12 rounded-[2px] border border-dashed border-hairline/30" aria-hidden />;
+    if (!s) return <div className="h-full rounded-[2px] border border-dashed border-hairline/30" aria-hidden />;
     const mark = marks?.get(s.id);
     const dim = marks && !mark;
     const active = highlight === s.id || mark?.cheapest;
@@ -66,7 +66,7 @@ export function AisleMap({ stores, marks, highlight }: { stores: Store[]; marks?
         ref={s.id === focusId ? focusRef : undefined}
         href={`/store/${s.id}`}
         aria-label={`${s.name}${mark ? ` ${won(mark.price)}` : ''}`}
-        className={`flex h-full min-h-12 flex-col justify-center rounded-[2px] border px-1.5 py-1 leading-tight ${
+        className={`flex h-full flex-col justify-center overflow-hidden rounded-[2px] border px-1.5 py-1 leading-tight ${
           active
             ? 'border-[#b85f00] bg-[#fff1df] shadow-[0_0_0_2px_var(--color-signal)]'
             : dim
@@ -94,7 +94,7 @@ export function AisleMap({ stores, marks, highlight }: { stores: Store[]; marks?
     'main-aisle',
     aisleRow,
     1,
-    <div className="carbon flex h-8 items-center justify-between rounded-[2px] px-2 text-[11px] font-bold text-nav-gold">
+    <div className="carbon flex h-full items-center justify-between rounded-[2px] px-2 text-[11px] font-bold text-nav-gold">
       <span>◀ {MARKET.west}</span>
       <span>{MARKET.east} ▶</span>
     </div>,
@@ -108,7 +108,7 @@ export function AisleMap({ stores, marks, highlight }: { stores: Store[]; marks?
     const rowOf = (pos: number) => (v.direction === 'down' ? bottomRow + pos : topRow - pos);
     const span = v.direction === 'down' ? [bottomRow, bottomRow + v.length] : [topRow - v.length, topRow];
     cells.push(
-      <div key={`${v.id}-aisle`} style={{ gridRow: `${span[0]} / span ${span[1]! - span[0]! + 1}`, gridColumn: vc }}>
+      <div key={`${v.id}-aisle`} className="min-h-0" style={{ gridRow: `${span[0]} / span ${span[1]! - span[0]! + 1}`, gridColumn: vc }}>
         <div className="carbon flex h-full items-center justify-center rounded-[2px] text-[10px] font-bold text-nav-gold [writing-mode:vertical-rl]">{v.name}</div>
       </div>,
     );
@@ -122,7 +122,7 @@ export function AisleMap({ stores, marks, highlight }: { stores: Store[]; marks?
   return (
     <div className="plate p-1.5" role="group" aria-label="청량리 청과물시장 지도">
       <div ref={scroller} className="overflow-x-auto overscroll-x-contain pb-1">
-        <div className="grid gap-1" style={{ gridTemplateColumns: template, gridTemplateRows: Array.from({ length: up + 3 + down }, (_, i) => (i + 1 === aisleRow ? '32px' : 'minmax(48px, auto)')).join(' ') }}>
+        <div className="grid gap-1" style={{ gridTemplateColumns: template, gridTemplateRows: Array.from({ length: up + 3 + down }, (_, i) => (i + 1 === aisleRow ? '30px' : '50px')).join(' ') }}>
           {cells}
         </div>
       </div>
