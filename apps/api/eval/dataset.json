@@ -6,47 +6,101 @@
       "store": "한농상회",
       "url": "https://raw.githubusercontent.com/DWL21/fruit-info/main/docs/research/assets/poc-samples/cheongnyangni-sample-03.png",
       "source": "PoC 현장 사진",
-      "expect": { "storeName": "한농상회", "prices": [
-        { "item": "mandarin", "price": 3000 },
-        { "item": "mandarin", "price": 6000 },
-        { "item": "mandarin", "price": 5000 }
-      ] }
+      "expect": {
+        "storeName": "한농상회",
+        "prices": [
+          {
+            "item": "mandarin",
+            "price": 3000
+          },
+          {
+            "item": "mandarin",
+            "price": 6000
+          },
+          {
+            "item": "mandarin",
+            "price": 5000
+          }
+        ]
+      }
     },
     {
       "id": "poc-02-hwaseung",
       "store": "화승청과",
       "url": "https://raw.githubusercontent.com/DWL21/fruit-info/main/docs/research/assets/poc-samples/cheongnyangni-sample-02.png",
       "source": "PoC 현장 사진",
-      "expect": { "storeName": "화승청과", "prices": [
-        { "item": "peach", "price": 5000 },
-        { "item": "grape", "price": 4000 },
-        { "item": "grape", "price": 5000 },
-        { "item": "grape", "price": 6000 }
-      ] }
+      "expect": {
+        "storeName": "화승청과",
+        "prices": [
+          {
+            "item": "peach",
+            "price": 5000
+          },
+          {
+            "item": "grape",
+            "price": 4000
+          },
+          {
+            "item": "grape",
+            "price": 5000
+          },
+          {
+            "item": "grape",
+            "price": 6000
+          },
+          {
+            "item": "avocado",
+            "price": 10000
+          }
+        ]
+      }
     },
     {
       "id": "poc-01-bukchang",
       "store": "북창상회",
       "url": "https://raw.githubusercontent.com/DWL21/fruit-info/main/docs/research/assets/poc-samples/cheongnyangni-sample-01.png",
       "source": "PoC 현장 사진",
-      "expect": { "storeName": "북창상회", "prices": [
-        { "item": "kiwi", "price": 2000 },
-        { "item": "kiwi", "price": 1000 }
-      ] }
+      "expect": {
+        "storeName": "북창상회",
+        "prices": [
+          {
+            "item": "kiwi",
+            "price": 2000
+          },
+          {
+            "item": "kiwi",
+            "price": 1000
+          },
+          {
+            "item": "melon",
+            "price": 5000
+          },
+          {
+            "item": "melon",
+            "price": 4000
+          }
+        ]
+      }
     },
     {
       "id": "kakao-wonyong-front",
       "store": "원용청과",
       "url": "https://postfiles.pstatic.net/MjAyNjA4MjNfMjc0/MDAxNzg3NDgxNjgxMDAx.ZbuPehqcs4bb8abPlbfh0iurrpbnv7vk7gBe311QGlMg.CBahijPYFn_wk-QIm4NMFI4ZIFgm87llpEp4NboZ7qIg.JPEG/IMG%EF%BC%BF4003.JPG?type=w966",
       "source": "카카오맵 장소 사진 (원용청과, 2026-08)",
-      "expect": { "storeName": "원용청과", "prices": [] }
+      "expect": {
+        "storeName": "원용청과",
+        "prices": []
+      }
     },
     {
       "id": "kakao-hwaseung-plate",
       "store": "화승청과",
       "url": "https://postfiles.pstatic.net/MjAyNjAyMTBfOTkg/MDAxNzcwNzE3OTEwMjY2.XFiuQmPOEDOJPgqxv5xnAtz15UGE9cIcGkipPhcYCisg.F3vhtHxgOvdvdgYeJ6dt2IcCZRAzSL3psMcxN251VA8g.JPEG/output%EF%BC%BF1519291292.jpg?type=w773",
       "source": "카카오맵 장소 사진 (화승청과, 2026-02, 접시 위 딸기)",
-      "expect": { "storeName": null, "prices": [] }
+      "expect": {
+        "storeName": null,
+        "prices": []
+      }
     }
   ]
 }
