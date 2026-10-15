@@ -12,6 +12,7 @@ import { live } from './live.ts';
 import { cropPath, photoPath, saveOriginal } from './media.ts';
 import { kickQueue } from './queue.ts';
 import * as repo from './repo.ts';
+import { capture } from './monitor.ts';
 
 const fail = (c: Context, status: 400 | 401 | 404 | 413 | 415 | 503, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
@@ -29,6 +30,7 @@ app.use('*', secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
 app.use('/api/*', cors({ origin: config.corsOrigins, allowHeaders: ['content-type', 'x-upload-key'], allowMethods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
 app.onError((err, c) => {
   console.error(err);
+  capture(err, { path: c.req.path });
   return c.json({ error: { code: 'internal', message: '요청을 처리하지 못했습니다.' } }, 500);
 });
 
@@ -48,6 +50,27 @@ app.get('/api/items/:slug', (c) => {
       item: { slug: item.slug, name: item.name, emoji: item.emoji },
       observations: repo.currentObservations({ itemSlug: item.slug }),
       history: repo.itemHistory(item.slug),
+    },
+  });
+});
+// North Star: 최근 4시간 안에 사진 근거가 있는 가게×과일 시세 수
+app.get('/api/metrics', (c) => {
+  const since4h = new Date(Date.now() - 4 * 3600_000).toISOString();
+  const kstToday = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const todayStart = new Date(`${kstToday}T00:00:00+09:00`).toISOString();
+  const one = (sql: string, ...args: unknown[]) => db.prepare(sql).get(...args) as Record<string, number | null>;
+  const fresh = one(`SELECT COUNT(DISTINCT store_id || ':' || item_slug) AS n FROM observations WHERE hidden = 0 AND observed_at >= ?`, since4h);
+  const today = one(`SELECT COUNT(DISTINCT store_id || ':' || item_slug) AS pairs, COUNT(DISTINCT store_id) AS stores, COUNT(DISTINCT item_slug) AS items FROM observations WHERE hidden = 0 AND observed_at >= ?`, todayStart);
+  const photos = one(
+    `SELECT COUNT(*) AS total, SUM(status = 'done') AS done, SUM(status = 'failed') AS failed, AVG(CASE WHEN status = 'done' THEN duration_ms END) AS avg_ms FROM photos WHERE taken_at >= ?`,
+    todayStart,
+  );
+  const storesTotal = one(`SELECT COUNT(*) AS n FROM stores WHERE active = 1`);
+  return c.json({
+    data: {
+      northStar: fresh.n ?? 0,
+      today: { pairs: today.pairs ?? 0, stores: today.stores ?? 0, items: today.items ?? 0, storesTotal: storesTotal.n ?? 0 },
+      photosToday: { total: photos.total ?? 0, done: photos.done ?? 0, failed: photos.failed ?? 0, avgSeconds: photos.avg_ms ? Math.round(photos.avg_ms / 1000) : null },
     },
   });
 });
