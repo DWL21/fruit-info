@@ -1,18 +1,41 @@
 import { useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { CATALOG, timeAgo, won } from '@fruit/shared';
-import { api } from '../lib/api.ts';
+import { api, type FeedSort } from '../lib/api.ts';
 import { Link } from '../components/Link.tsx';
 import { Empty, ErrorBox, Loading, SectionTitle } from '../components/States.tsx';
 import { FeedCard } from '../components/FeedCard.tsx';
 
+const SORT_KEY = 'fruit.feedSort';
+const SORTS: { id: FeedSort; label: string }[] = [
+  { id: 'latest', label: '최신순' },
+  { id: 'popular', label: '추천순' },
+];
+function readSort(): FeedSort {
+  try {
+    return localStorage.getItem(SORT_KEY) === 'popular' ? 'popular' : 'latest';
+  } catch {
+    return 'latest';
+  }
+}
+
 export function HomePage() {
   const items = useQuery({ queryKey: ['items'], queryFn: api.items });
+  const [sort, setSortState] = useState<FeedSort>(readSort);
+  const setSort = (s: FeedSort) => {
+    setSortState(s);
+    try {
+      localStorage.setItem(SORT_KEY, s);
+    } catch {
+      /* 저장 불가 환경 */
+    }
+  };
   const feed = useInfiniteQuery({
-    queryKey: ['feed'],
-    queryFn: ({ pageParam }) => api.feed(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => (last.length === 12 ? last.at(-1)!.photo.takenAt : undefined),
+    queryKey: ['feed', sort],
+    queryFn: ({ pageParam }) => api.feed(sort, pageParam),
+    initialPageParam: undefined as string | number | undefined,
+    getNextPageParam: (last, pages) =>
+      last.length < 12 ? undefined : sort === 'popular' ? pages.reduce((n, p) => n + p.length, 0) : last.at(-1)!.photo.takenAt,
   });
   const entries = feed.data?.pages.flat() ?? [];
   const [q, setQ] = useState('');
@@ -43,7 +66,20 @@ export function HomePage() {
         </ul>
       )}
 
-      <section className="mt-3 space-y-5" aria-label="최신 매대 사진">
+      <div className="mt-3 flex gap-1" role="tablist" aria-label="정렬">
+        {SORTS.map((s) => (
+          <button
+            key={s.id}
+            role="tab"
+            aria-selected={sort === s.id}
+            onClick={() => setSort(s.id)}
+            className={`min-h-10 rounded-full px-4 text-sm font-bold ${sort === s.id ? 'carbon text-nav-gold' : 'bg-white/70 text-carbon'}`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <section className="mt-3 space-y-5" aria-label="매대 사진">
         {feed.isPending ? (
           <Loading />
         ) : feed.isError ? (

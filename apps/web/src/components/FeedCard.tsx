@@ -2,6 +2,7 @@ import { placeName, timeAgo } from '@fruit/shared';
 import type { FeedEntry } from '../lib/api.ts';
 import { Link } from './Link.tsx';
 import { StallPhoto } from './StallPhoto.tsx';
+import { LikeButton } from './LikeButton.tsx';
 
 /** 피드 한 장: 가게 머리글 + 매대 전체 사진(가격표 번호) + 가격 목록. */
 export function FeedCard({ entry }: { entry: FeedEntry }) {
@@ -31,6 +32,7 @@ export function FeedCard({ entry }: { entry: FeedEntry }) {
           <p className="px-1 pt-1.5 text-xs font-bold text-chrome">시세 없음</p>
         </div>
       )}
+      <LikeButton photoId={photo.id} likes={photo.likes} liked={entry.liked} />
     </article>
   );
 }
