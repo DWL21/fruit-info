@@ -72,6 +72,7 @@ export const adminApi = {
     if (autoStore) form.set('autoStore', '1');
     return request<Photo>('/api/admin/photos', adminInit({ method: 'POST', body: form }));
   },
+  moveStore: (id: string, storeId: number) => request<Photo>(`/api/admin/photos/${id}`, jsonInit('PATCH', { storeId })),
   reanalyze: (id: string) => request<Photo>(`/api/admin/photos/${id}/reanalyze`, adminInit({ method: 'POST' })),
   createStore: (input: StoreInput) => request<Store>('/api/admin/stores', jsonInit('POST', input)),
   updateStore: (id: number, input: Partial<StoreInput>) => request<Store>(`/api/admin/stores/${id}`, jsonInit('PATCH', input)),

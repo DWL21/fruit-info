@@ -12,7 +12,9 @@ import { NotFound } from './components/States.tsx';
 
 export function App() {
   const location = useLocation();
-  useEffect(() => trackPage(location), [location]);
+  useEffect(() => {
+    trackPage(location);
+  }, [location]);
   const path = location.split('?')[0]!;
   if (path === '/shoot') return <ShootPage />;
 
