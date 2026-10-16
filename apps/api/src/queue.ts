@@ -10,7 +10,17 @@ import { isOutlier, needsReview } from './publish.ts';
 
 let running = 0;
 
-const normName = (s: string) => s.replace(/[\s()·.]/g, '').toLowerCase();
+const normName = (s: string) => s.replace(/[\s()·.…]/g, '').toLowerCase();
+/** 간판마다 붙는 업종 이름은 떼고 비교한다 (덕신청과 = 덕신상회) */
+const SUFFIX = /(청과물|청과|상회|유통|농산물|농산|상사|과일|청과상회)$/;
+function coreName(s: string) {
+  let n = normName(s).replace(/^청량리/, '').replace(/\d+$/, '');
+  while (SUFFIX.test(n) && n.replace(SUFFIX, '').length > 0) n = n.replace(SUFFIX, '');
+  return n;
+}
+
+/** 매대 사진이 아니고 시세도 하나 없으면 공개하지 않고 보류한다. */
+export const isInvalid = (analysis: { stall_photo: boolean }, observations: number) => !analysis.stall_photo && observations === 0;
 
 interface StoreRef { id: number; name: string; aisle: Aisle; position: number; side: Side }
 
@@ -19,7 +29,18 @@ export function resolveStore(readName: string | null, selectedId: number): numbe
   if (!readName) return selectedId;
   const stores = db.prepare('SELECT id, name, aisle, position, side FROM stores WHERE active = 1').all() as StoreRef[];
   const target = normName(readName);
-  const matches = stores.filter((s) => normName(s.name) === target);
+  let matches = stores.filter((s) => normName(s.name) === target);
+  if (!matches.length) {
+    // 업종 이름만 다른 경우, 또는 앞이 잘려 읽힌 간판(…풍상회)
+    const core = coreName(readName);
+    const truncated = /^[…·.]/.test(readName.trim());
+    if (core.length >= 2) matches = stores.filter((s) => coreName(s.name) === core);
+    if (!matches.length && truncated && core.length >= 1) {
+      const hits = stores.filter((s) => coreName(s.name).endsWith(core));
+      // 서로 다른 가게 이름이 여럿 걸리면 판단하지 않는다
+      if (new Set(hits.map((s) => coreName(s.name))).size === 1) matches = hits;
+    }
+  }
   if (!matches.length) return selectedId;
   if (matches.some((s) => s.id === selectedId)) return selectedId;
   const selected = stores.find((s) => s.id === selectedId);
@@ -82,8 +103,8 @@ async function processOne(): Promise<boolean> {
         created.push({ id: row.id, slug: item.slug, box: cropBox(it.price_box, it.product_box) });
       }
       db.prepare(
-        `UPDATE photos SET status = 'done', read_store_name = ?, model = ?, duration_ms = ?, raw = ?, error = NULL WHERE id = ?`,
-      ).run(analysis.store_name, result.model, result.durationMs, result.raw, next.id);
+        `UPDATE photos SET status = 'done', read_store_name = ?, model = ?, duration_ms = ?, raw = ?, error = NULL, held = ? WHERE id = ?`,
+      ).run(analysis.store_name, result.model, result.durationMs, result.raw, isInvalid(analysis, created.length) ? 1 : 0, next.id);
     })();
 
     for (const c of created) {

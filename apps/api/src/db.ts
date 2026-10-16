@@ -66,6 +66,7 @@ const migrations: string[] = [
   `ALTER TABLE stores ADD COLUMN stall_no TEXT;`,
   `ALTER TABLE photos ADD COLUMN sample INTEGER NOT NULL DEFAULT 0;
    CREATE INDEX photos_sample ON photos(sample);`,
+  `ALTER TABLE photos ADD COLUMN held INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (id INTEGER PRIMARY KEY)');
