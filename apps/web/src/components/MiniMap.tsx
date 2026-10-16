@@ -97,11 +97,11 @@ export function MiniMap({
           return (
             <g key={i} opacity={shown ? 1 : 0.35}>
               {i > 0 && <line x1={x1} y1={LABEL_Y + 3} x2={x1} y2={southRoadY} stroke="var(--color-carbon)" strokeWidth="0.6" strokeDasharray="1.5 1.5" />}
-              <rect x={x1 + 0.5} y={ROAD_Y + 1.5} width={x2 - x1 - 1} height={ROAD_H - 3} rx="1.5" fill={on ? 'var(--color-signal)' : 'transparent'} />
+              <rect x={x1 + 0.5} y={ROAD_Y + 1.5} width={x2 - x1 - 1} height={ROAD_H - 3} rx="1.5" fill={on ? 'var(--color-teal)' : 'transparent'} />
               <text x={(x1 + x2) / 2} y={ROAD_Y + 8} fontSize="7.5" fontWeight="900" textAnchor="middle" fill={on ? '#fff' : 'var(--color-nav-gold)'}>
                 {i + 1}
               </text>
-              {on && <rect x={x1 + 0.5} y={LABEL_Y + 3} width={x2 - x1 - 1} height={southRoadY - LABEL_Y - 3} rx="2" fill="none" stroke="var(--color-signal)" strokeWidth="1.4" />}
+              {on && <rect x={x1 + 0.5} y={LABEL_Y + 3} width={x2 - x1 - 1} height={southRoadY - LABEL_Y - 3} rx="2" fill="none" stroke="var(--color-teal)" strokeWidth="1.6" />}
               {onPick && (
                 <rect
                   x={x1}
