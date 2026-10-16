@@ -1,4 +1,4 @@
-import { isTodayKst, placeName, timeAgo, won, type Observation } from '@fruit/shared';
+import { isTodayKst, placeName, timeAgo, unitPrice, won, type Observation } from '@fruit/shared';
 import { Link } from './Link.tsx';
 
 export function FreshBadge({ at }: { at: string }) {
@@ -49,8 +49,14 @@ export function PriceCard({ o, rank, showStore = true, title }: { o: Observation
         <div className="plate-white shrink-0 px-2.5 py-1.5 text-right">
           <p className="num font-display text-2xl font-black tracking-tight">{won(o.price)}</p>
           <p className="text-xs font-bold text-chrome">{o.unit ?? '단위 미표기'}</p>
+          <UnitPrice price={o.price} unit={o.unit} />
         </div>
       </div>
     </article>
   );
+}
+
+export function UnitPrice({ price, unit }: { price: number; unit: string | null }) {
+  const u = unitPrice(price, unit);
+  return u ? <p className="num text-[11px] font-bold text-[#c25f00]">{u.per}당 {won(u.value)}</p> : null;
 }
