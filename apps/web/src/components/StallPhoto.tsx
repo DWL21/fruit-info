@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CATALOG, isTodayKst, timeAgo, won, type Observation, type Photo } from '@fruit/shared';
 import { Link } from './Link.tsx';
+import { UnitPrice } from './PriceCard.tsx';
 
 /**
  * 가게 매대 전체 사진에 가격표 위치를 번호로 표시하고, 아래 가격 목록과 같은 번호로 잇는다.
@@ -63,9 +64,12 @@ export function StallPhoto({ photo, observations }: { photo: Photo; observations
                   {c?.emoji} <b>{c?.name ?? o.rawName}</b>
                   {o.variety && <span className="ml-1 text-sm text-chrome">{o.variety}</span>}
                 </span>
-                <span className="num shrink-0 font-display font-black">
+                <span className="num shrink-0 text-right font-display font-black">
                   {won(o.price)}
                   {o.unit && <span className="ml-1 font-sans text-xs font-bold text-chrome">/{o.unit}</span>}
+                  <span className="block font-sans">
+                    <UnitPrice price={o.price} unit={o.unit} />
+                  </span>
                 </span>
               </button>
             </li>
