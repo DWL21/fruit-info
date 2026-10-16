@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { CATALOG, placeName, segmentIndex, timeAgo } from '@fruit/shared';
+import { placeName, segmentIndex, timeAgo, type Observation } from '@fruit/shared';
 import { api } from '../lib/api.ts';
 import { MiniMap } from '../components/MiniMap.tsx';
 import { navigate } from '../lib/router.ts';
-import { PriceCard } from '../components/PriceCard.tsx';
+import { StallPhoto } from '../components/StallPhoto.tsx';
 import { Empty, ErrorBox, Loading, SectionTitle } from '../components/States.tsx';
 import { Link } from '../components/Link.tsx';
 
@@ -13,8 +13,11 @@ export function StorePage({ id }: { id: number }) {
   if (detail.isPending) return <Loading />;
   if (detail.isError) return <ErrorBox error={detail.error} retry={() => detail.refetch()} />;
   const { store, observations, photos } = detail.data;
-  const name = (slug: string) => CATALOG.find((c) => c.slug === slug);
-  const sorted = [...observations].sort((a, b) => a.itemSlug.localeCompare(b.itemSlug) || a.price - b.price);
+  // 현재 시세를 사진별로 묶어 매대 전체 사진과 함께 보여준다.
+  const byPhoto = new Map<string, Observation[]>();
+  for (const o of observations) byPhoto.set(o.photoId, [...(byPhoto.get(o.photoId) ?? []), o]);
+  const shown = photos.filter((p) => byPhoto.has(p.id));
+  const others = photos.filter((p) => !byPhoto.has(p.id));
 
   return (
     <div className="space-y-5">
@@ -29,27 +32,24 @@ export function StorePage({ id }: { id: number }) {
       </div>
       {stores.data && <MiniMap stores={stores.data} highlight={store.id} active={segmentIndex(store)} onPick={(i) => navigate(`/map?seg=${i + 1}`)} />}
       <section>
-        <SectionTitle>과일</SectionTitle>
-        {sorted.length ? (
-          <ul className="mt-2 grid gap-3 sm:grid-cols-2">
-            {sorted.map((o) => {
-              const c = name(o.itemSlug);
-              return (
-                <li key={o.id}>
-                  <PriceCard o={o} showStore={false} title={`${c?.emoji ?? ''} ${c?.name ?? o.rawName}`} />
-                </li>
-              );
-            })}
+        <SectionTitle>시세</SectionTitle>
+        {shown.length ? (
+          <ul className="mt-2 space-y-3">
+            {shown.map((p) => (
+              <li key={p.id}>
+                <StallPhoto photo={p} observations={byPhoto.get(p.id)!} />
+              </li>
+            ))}
           </ul>
         ) : (
           <Empty title="시세 없음" />
         )}
       </section>
-      {photos.length > 0 && (
+      {others.length > 0 && (
         <section>
-          <SectionTitle>매대 사진</SectionTitle>
+          <SectionTitle>이전 사진</SectionTitle>
           <ul className="plate mt-0 grid grid-cols-3 gap-1.5 rounded-t-none p-1.5">
-            {photos.map((p) => (
+            {others.map((p) => (
               <li key={p.id}>
                 <Link href={`/photo/${p.id}`} className="block">
                   <img src={p.url} alt={`${timeAgo(p.takenAt)} 촬영한 매대`} loading="lazy" className="aspect-square w-full rounded-[2px] border border-chrome object-cover" />
