@@ -114,6 +114,8 @@ export const Photo = z.object({
   status: PhotoStatus,
   readStoreName: z.string().nullable(),
   itemCount: z.number(),
+  /** 운영자 확인 대기 시세 수 */
+  reviewCount: z.number(),
   error: z.string().nullable(),
   durationMs: z.number().nullable(),
   takenAt: z.string(),

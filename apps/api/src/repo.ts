@@ -115,16 +115,17 @@ export const getStore = (id: number) => listStores().find((s) => s.id === id) ??
 
 interface PhotoRow {
   id: string; store_id: number; store_name: string; width: number; height: number; status: Photo['status'];
-  read_store_name: string | null; item_count: number; error: string | null; duration_ms: number | null; taken_at: string;
+  read_store_name: string | null; item_count: number; review_count: number; error: string | null; duration_ms: number | null; taken_at: string;
 }
 
 const PHOTO_SQL = `SELECT p.id, p.store_id, s.name AS store_name, p.width, p.height, p.status, p.read_store_name, p.error,
-  p.duration_ms, p.taken_at, (SELECT COUNT(*) FROM observations o WHERE o.photo_id = p.id AND o.hidden = 0) AS item_count
+  p.duration_ms, p.taken_at, (SELECT COUNT(*) FROM observations o WHERE o.photo_id = p.id AND o.hidden = 0) AS item_count,
+  (SELECT COUNT(*) FROM observations o WHERE o.photo_id = p.id AND o.review = 1) AS review_count
   FROM photos p JOIN stores s ON s.id = p.store_id`;
 
 const toPhoto = (r: PhotoRow): Photo => ({
   id: r.id, storeId: r.store_id, storeName: r.store_name, url: photoUrl(r.id), width: r.width, height: r.height,
-  status: r.status, readStoreName: r.read_store_name, itemCount: r.item_count, error: r.error,
+  status: r.status, readStoreName: r.read_store_name, itemCount: r.item_count, reviewCount: r.review_count, error: r.error,
   durationMs: r.duration_ms, takenAt: r.taken_at,
 });
 

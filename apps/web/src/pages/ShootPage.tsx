@@ -186,6 +186,7 @@ function Shooter() {
 
   const photos = useQuery({ queryKey: ['admin-photos'], queryFn: adminApi.photos, refetchInterval: 4000 });
   const analyzing = photos.data?.filter((p) => p.status === 'queued' || p.status === 'analyzing').length ?? 0;
+  const reviewing = photos.data?.reduce((n, p) => n + p.reviewCount, 0) ?? 0;
 
   return (
     <div className="flex min-h-dvh flex-col bg-black text-white">
@@ -240,7 +241,10 @@ function Shooter() {
             aria-label={`${current?.name ?? ''} 촬영`}
             className="size-20 rounded-full border-4 border-white bg-white/90 shadow-lg active:scale-95 disabled:opacity-40"
           />
-          <button onClick={() => setPanel('results')} className="min-h-12 w-20 rounded-xl bg-white/10 text-sm">결과</button>
+          <button onClick={() => setPanel('results')} className="relative min-h-12 w-20 rounded-xl bg-white/10 text-sm" aria-label={reviewing ? `결과, 확인 대기 ${reviewing}건` : '결과'}>
+            결과
+            {reviewing > 0 && <span className="chip-amber absolute -top-2 -right-2 min-w-6 rounded-full px-1.5 text-xs">{reviewing}</span>}
+          </button>
         </div>
       </div>
 
@@ -377,6 +381,7 @@ function ResultsPanel({ photos, jobs, retry, onClose }: { photos: Photo[]; jobs:
                 <span className="block text-xs text-chrome">
                   {timeAgo(p.takenAt)} · {statusLabel[p.status]}
                   {p.status === 'done' && ` · 시세 ${p.itemCount}개`}
+                  {p.reviewCount > 0 && <span className="font-bold text-[#c25f00]"> · 확인 대기 {p.reviewCount}</span>}
                   {p.durationMs && ` · ${Math.round(p.durationMs / 1000)}초`}
                 </span>
                 {p.readStoreName && p.readStoreName.replace(/\s/g, '') !== p.storeName.replace(/\s/g, '') && (
