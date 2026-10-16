@@ -44,7 +44,7 @@ export function StallPhoto({ photo, observations }: { photo: Photo; observations
         <span className={`absolute left-2 top-2 rounded-[2px] px-1.5 py-0.5 text-[11px] font-bold ${today ? 'chip-amber' : 'bg-muted-indigo text-white'}`}>
           {today ? '오늘' : '이전'} · {timeAgo(photo.takenAt)} 촬영
         </span>
-        <Link href={`/photo/${photo.id}`} className="carbon absolute bottom-2 right-2 rounded-[2px] px-1.5 py-0.5 text-[11px] font-bold">
+        <Link href={`/photo/${photo.id}`} className="carbon absolute right-2 top-2 rounded-[2px] px-1.5 py-0.5 text-[11px] font-bold">
           크게 보기 ›
         </Link>
       </div>
