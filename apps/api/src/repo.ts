@@ -1,6 +1,6 @@
 import { CATALOG, VISIBLE_DAYS, walkKey, type Aisle, type Box, type ItemSummary, type Observation, type Photo, type Store } from '@fruit/shared';
 import { db } from './db.ts';
-import { cropUrl, photoUrl, previewUrl } from './media.ts';
+import { cropUrl, photoUrl } from './media.ts';
 
 const parseBox = (s: string | null): Box | null => (s ? (JSON.parse(s) as Box) : null);
 const since = () => new Date(Date.now() - VISIBLE_DAYS * 86400_000).toISOString();
@@ -174,20 +174,20 @@ export function itemHistory(itemSlug: string) {
     .all(itemSlug) as { day: string; min_price: number; stores: number }[];
 }
 
-/** 피드: 실패하지 않은 최신 사진과 그 시세 */
+/** 피드: 분석이 끝나 게시된 최신 사진과 그 시세 (대기·분석 중은 숨김) */
 export function feed(limit: number, before?: string) {
   const rows = db
     .prepare(
-      `${PHOTO_SQL} WHERE p.status != 'failed' AND p.sample = 0 AND p.held = 0 AND s.active = 1 ${before ? 'AND p.taken_at < @before' : ''} ORDER BY p.taken_at DESC LIMIT @limit`,
+      `${PHOTO_SQL} WHERE p.status = 'done' AND p.sample = 0 AND p.held = 0 AND s.active = 1 ${before ? 'AND p.taken_at < @before' : ''} ORDER BY p.taken_at DESC LIMIT @limit`,
     )
     .all({ limit, before }) as PhotoRow[];
   return rows.map((r) => {
     const photo = toPhoto(r);
     const store = getStore(r.store_id);
     return {
-      photo: photo.status === 'done' ? photo : { ...photo, url: previewUrl(photo.id) },
+      photo,
       store,
-      observations: photo.status === 'done' ? photoObservations(photo.id) : [],
+      observations: photoObservations(photo.id),
     };
   });
 }
