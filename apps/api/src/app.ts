@@ -13,8 +13,9 @@ import { cropPath, photoPath, saveOriginal } from './media.ts';
 import { kickQueue } from './queue.ts';
 import * as repo from './repo.ts';
 import { capture } from './monitor.ts';
+import { isLocked, recordFail, recordSuccess } from './lockout.ts';
 
-const fail = (c: Context, status: 400 | 401 | 404 | 413 | 415 | 503, code: string, message: string) =>
+const fail = (c: Context, status: 400 | 401 | 404 | 413 | 415 | 429 | 503, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
 
 function isOperator(key: string | undefined) {
@@ -138,8 +139,17 @@ app.get('/media/crops/:file', (c) => sendJpeg(c, cropPath(Number(safeId(c.req.pa
 
 // ---------- 운영자 ----------
 const admin = new Hono();
+// 터널·nginx 뒤라 실제 접속지는 Cloudflare 헤더로 판단한다.
+const clientIp = (c: Context) => c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+
 admin.use('*', async (c, next) => {
-  if (!isOperator(c.req.header('x-upload-key'))) return fail(c, 401, 'unauthorized', '촬영 키가 올바르지 않습니다.');
+  const ip = clientIp(c);
+  if (isLocked(ip)) return fail(c, 429, 'locked', '잠시 후 다시 시도하세요.');
+  if (!isOperator(c.req.header('x-upload-key'))) {
+    recordFail(ip);
+    return fail(c, 401, 'unauthorized', '촬영 키가 올바르지 않습니다.');
+  }
+  recordSuccess(ip);
   await next();
 });
 
