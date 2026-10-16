@@ -60,10 +60,11 @@ app.get('/api/metrics', (c) => {
   const kstToday = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const todayStart = new Date(`${kstToday}T00:00:00+09:00`).toISOString();
   const one = (sql: string, ...args: unknown[]) => db.prepare(sql).get(...args) as Record<string, number | null>;
-  const fresh = one(`SELECT COUNT(DISTINCT store_id || ':' || item_slug) AS n FROM observations WHERE hidden = 0 AND observed_at >= ?`, since4h);
-  const today = one(`SELECT COUNT(DISTINCT store_id || ':' || item_slug) AS pairs, COUNT(DISTINCT store_id) AS stores, COUNT(DISTINCT item_slug) AS items FROM observations WHERE hidden = 0 AND observed_at >= ?`, todayStart);
+  const pub = `photo_id IN (SELECT id FROM photos WHERE sample = 0)`;
+  const fresh = one(`SELECT COUNT(DISTINCT store_id || ':' || item_slug) AS n FROM observations WHERE hidden = 0 AND ${pub} AND observed_at >= ?`, since4h);
+  const today = one(`SELECT COUNT(DISTINCT store_id || ':' || item_slug) AS pairs, COUNT(DISTINCT store_id) AS stores, COUNT(DISTINCT item_slug) AS items FROM observations WHERE hidden = 0 AND ${pub} AND observed_at >= ?`, todayStart);
   const photos = one(
-    `SELECT COUNT(*) AS total, SUM(status = 'done') AS done, SUM(status = 'failed') AS failed, AVG(CASE WHEN status = 'done' THEN duration_ms END) AS avg_ms FROM photos WHERE taken_at >= ?`,
+    `SELECT COUNT(*) AS total, SUM(status = 'done') AS done, SUM(status = 'failed') AS failed, AVG(CASE WHEN status = 'done' THEN duration_ms END) AS avg_ms FROM photos WHERE sample = 0 AND taken_at >= ?`,
     todayStart,
   );
   const storesTotal = one(`SELECT COUNT(*) AS n FROM stores WHERE active = 1`);
@@ -83,7 +84,7 @@ app.get('/api/stores/:id', (c) => {
     data: {
       store,
       observations: repo.currentObservations({ storeId: store.id }),
-      photos: repo.listPhotos({ storeId: store.id, status: 'done', limit: 12 }),
+      photos: repo.listPhotos({ storeId: store.id, status: 'done', limit: 12, publicOnly: true }),
     },
   });
 });
@@ -95,7 +96,7 @@ app.get('/api/feed', (c) => {
 });
 app.get('/api/photos/:id', (c) => {
   const photo = repo.getPhoto(c.req.param('id'));
-  if (!photo || photo.status !== 'done') return fail(c, 404, 'not_found', '없는 사진입니다.');
+  if (!photo || photo.status !== 'done' || repo.isSample(photo.id)) return fail(c, 404, 'not_found', '없는 사진입니다.');
   return c.json({ data: { photo, observations: repo.photoObservations(photo.id) } });
 });
 
@@ -194,6 +195,8 @@ admin.post('/photos', async (c) => {
   const storeId = Number(form?.get('storeId'));
   const takenAtRaw = String(form?.get('takenAt') ?? '');
   const autoStore = form?.get('autoStore') === '1' ? 1 : 0;
+  // 평가용 업로드: 같은 파이프라인을 타지만 공개 화면에는 나오지 않는다.
+  const sample = form?.get('sample') === '1' ? 1 : 0;
   if (!(file instanceof File)) return fail(c, 400, 'invalid', '사진이 없습니다.');
   if (file.size > 15_000_000) return fail(c, 413, 'too_large', '사진이 너무 큽니다 (15MB 이하).');
   if (!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type)) return fail(c, 415, 'unsupported', '지원하지 않는 사진 형식입니다.');
@@ -204,13 +207,13 @@ admin.post('/photos', async (c) => {
   const { width, height } = await saveOriginal(id, Buffer.from(await file.arrayBuffer())).catch(() => ({ width: 0, height: 0 }));
   if (!width) return fail(c, 415, 'unsupported', '사진을 읽을 수 없습니다.');
   await makePreview(id).catch(() => undefined);
-  db.prepare('INSERT INTO photos (id, store_id, width, height, taken_at, auto_store) VALUES (?, ?, ?, ?, ?, ?)').run(id, storeId, width, height, takenAt, autoStore);
-  live.publish({ type: 'feed', photoId: id });
+  db.prepare('INSERT INTO photos (id, store_id, width, height, taken_at, auto_store, sample) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, storeId, width, height, takenAt, autoStore, sample);
+  if (!sample) live.publish({ type: 'feed', photoId: id });
   kickQueue();
   return c.json({ data: repo.getPhoto(id) }, 202);
 });
 
-admin.get('/photos', (c) => c.json({ data: repo.listPhotos({ limit: Number(c.req.query('limit') ?? 40) }) }));
+admin.get('/photos', (c) => c.json({ data: repo.listPhotos({ limit: Number(c.req.query('limit') ?? 40), publicOnly: c.req.query('sample') !== '1', sample: c.req.query('sample') === '1' }) }));
 admin.get('/photos/:id', (c) => {
   const photo = repo.getPhoto(c.req.param('id'));
   if (!photo) return fail(c, 404, 'not_found', '없는 사진입니다.');

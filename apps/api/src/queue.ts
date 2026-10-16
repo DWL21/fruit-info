@@ -3,7 +3,7 @@ import { analyze } from './analyzer.ts';
 import { db } from './db.ts';
 import { live } from './live.ts';
 import { cropBox, makeCrop, originalPath, publishPhoto } from './media.ts';
-import { currentObservations, getPhoto } from './repo.ts';
+import { currentObservations, getPhoto, isSample } from './repo.ts';
 import { config } from './config.ts';
 import { capture } from './monitor.ts';
 import { isOutlier, needsReview } from './publish.ts';
@@ -31,7 +31,7 @@ export function resolveStore(readName: string | null, selectedId: number): numbe
 function emitPhoto(id: string) {
   const photo = getPhoto(id);
   if (photo) live.publish({ type: 'photo', photo });
-  live.publish({ type: 'feed', photoId: id });
+  if (!isSample(id)) live.publish({ type: 'feed', photoId: id });
 }
 
 /** 큐에서 사진 하나를 꺼내 분석·게시한다. */
@@ -91,7 +91,7 @@ async function processOne(): Promise<boolean> {
       await makeCrop(next.id, c.id, c.box);
       db.prepare('UPDATE observations SET crop = 1 WHERE id = ?').run(c.id);
     }
-    live.publish({ type: 'prices', storeId: next.store_id, itemSlugs: [...new Set(created.map((c) => c.slug))] });
+    if (!isSample(next.id)) live.publish({ type: 'prices', storeId: next.store_id, itemSlugs: [...new Set(created.map((c) => c.slug))] });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const attempts = (db.prepare('SELECT attempts FROM photos WHERE id = ?').get(next.id) as { attempts: number }).attempts;
