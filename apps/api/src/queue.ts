@@ -31,6 +31,7 @@ export function resolveStore(readName: string | null, selectedId: number): numbe
 function emitPhoto(id: string) {
   const photo = getPhoto(id);
   if (photo) live.publish({ type: 'photo', photo });
+  live.publish({ type: 'feed', photoId: id });
 }
 
 /** 큐에서 사진 하나를 꺼내 분석·게시한다. */

@@ -9,7 +9,7 @@ import { CATALOG, ObservationPatch, StoreInput, type LiveEvent } from '@fruit/sh
 import { config } from './config.ts';
 import { db, now } from './db.ts';
 import { live } from './live.ts';
-import { cropPath, photoPath, saveOriginal } from './media.ts';
+import { cropPath, makePreview, photoPath, previewPath, saveOriginal } from './media.ts';
 import { kickQueue } from './queue.ts';
 import * as repo from './repo.ts';
 import { capture } from './monitor.ts';
@@ -87,6 +87,12 @@ app.get('/api/stores/:id', (c) => {
     },
   });
 });
+// 홈 피드: 최신 매대 사진. 분석 전 사진은 흐린 미리보기로 바로 보인다.
+app.get('/api/feed', (c) => {
+  const limit = Math.min(30, Math.max(1, Number(c.req.query('limit') ?? 12)));
+  const before = c.req.query('before');
+  return c.json({ data: repo.feed(limit, before) });
+});
 app.get('/api/photos/:id', (c) => {
   const photo = repo.getPhoto(c.req.param('id'));
   if (!photo || photo.status !== 'done') return fail(c, 404, 'not_found', '없는 사진입니다.');
@@ -111,6 +117,7 @@ app.get('/api/stream', (c) =>
       if (e) {
         // 공개 스트림에는 게시 완료된 정보만 보낸다.
         if (e.type === 'prices') await stream.writeSSE({ event: 'prices', data: JSON.stringify(e) });
+        if (e.type === 'feed') await stream.writeSSE({ event: 'feed', data: JSON.stringify(e) });
         continue;
       }
       await Promise.race([new Promise<void>((r) => (wake = r)), stream.sleep(25_000)]);
@@ -135,6 +142,7 @@ function sendJpeg(c: Context, path: string) {
 }
 const safeId = (s: string) => s.replace(/\.jpg$/, '').replace(/[^a-zA-Z0-9-]/g, '');
 app.get('/media/photos/:file', (c) => sendJpeg(c, photoPath(safeId(c.req.param('file')))));
+app.get('/media/previews/:file', (c) => sendJpeg(c, previewPath(safeId(c.req.param('file')))));
 app.get('/media/crops/:file', (c) => sendJpeg(c, cropPath(Number(safeId(c.req.param('file'))))));
 
 // ---------- 운영자 ----------
@@ -195,7 +203,9 @@ admin.post('/photos', async (c) => {
   const id = randomUUID();
   const { width, height } = await saveOriginal(id, Buffer.from(await file.arrayBuffer())).catch(() => ({ width: 0, height: 0 }));
   if (!width) return fail(c, 415, 'unsupported', '사진을 읽을 수 없습니다.');
+  await makePreview(id).catch(() => undefined);
   db.prepare('INSERT INTO photos (id, store_id, width, height, taken_at, auto_store) VALUES (?, ?, ?, ?, ?, ?)').run(id, storeId, width, height, takenAt, autoStore);
+  live.publish({ type: 'feed', photoId: id });
   kickQueue();
   return c.json({ data: repo.getPhoto(id) }, 202);
 });

@@ -12,6 +12,9 @@ export function useLiveUpdates() {
     es.addEventListener('prices', () => {
       void qc.invalidateQueries();
     });
+    es.addEventListener('feed', () => {
+      void qc.invalidateQueries({ queryKey: ['feed'] });
+    });
     es.onerror = () => setConnected(false);
     return () => es.close();
   }, [qc]);
