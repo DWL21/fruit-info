@@ -26,10 +26,10 @@ export function Layout({ path, children }: { path: string; children: ReactNode }
             <img src="/icon.svg" alt="" className="size-6" />
             <span className="font-display text-[15px] font-black tracking-tight text-primary">청량리 과일 시세</span>
           </Link>
-          <span className="chip-amber flex items-center gap-1.5 px-2 py-1 text-[11px]" aria-live="polite">
+          <Link href="/shoot" className="chip-amber flex min-h-8 items-center gap-1.5 px-2 py-1 text-[11px]" aria-live="polite">
             <span className={`size-2 rounded-full ${connected ? 'animate-pulse bg-green-600' : 'bg-muted-indigo'}`} />
             {connected ? 'LIVE' : '연결 중'}
-          </span>
+          </Link>
         </div>
         <nav className="carbon flex border-t border-black/60" aria-label="주 메뉴">
           {tabs.map((t) => {

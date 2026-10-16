@@ -80,6 +80,8 @@ export const adminApi = {
     return request<Photo>('/api/admin/photos', adminInit({ method: 'POST', body: form }));
   },
   moveStore: (id: string, storeId: number) => request<Photo>(`/api/admin/photos/${id}`, jsonInit('PATCH', { storeId })),
+  deletePhotos: (ids: string[]) => request<{ deleted: string[]; skipped: string[] }>('/api/admin/photos/delete', jsonInit('POST', { ids })),
+  deleteObservations: (ids: number[]) => request<{ deleted: number }>('/api/admin/observations/delete', jsonInit('POST', { ids })),
   reanalyze: (id: string) => request<Photo>(`/api/admin/photos/${id}/reanalyze`, adminInit({ method: 'POST' })),
   createStore: (input: StoreInput) => request<Store>('/api/admin/stores', jsonInit('POST', input)),
   updateStore: (id: number, input: Partial<StoreInput>) => request<Store>(`/api/admin/stores/${id}`, jsonInit('PATCH', input)),

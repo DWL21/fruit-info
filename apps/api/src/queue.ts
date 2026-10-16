@@ -94,7 +94,9 @@ async function processOne(): Promise<boolean> {
     if (!isSample(next.id)) live.publish({ type: 'prices', storeId: next.store_id, itemSlugs: [...new Set(created.map((c) => c.slug))] });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const attempts = (db.prepare('SELECT attempts FROM photos WHERE id = ?').get(next.id) as { attempts: number }).attempts;
+    const row = db.prepare('SELECT attempts FROM photos WHERE id = ?').get(next.id) as { attempts: number } | undefined;
+    if (!row) return true;
+    const attempts = row.attempts;
     // 두 번까지 다시 시도한다.
     db.prepare(`UPDATE photos SET status = ?, error = ? WHERE id = ?`).run(attempts < 3 ? 'queued' : 'failed', message.slice(0, 300), next.id);
     console.error(`[analyze] ${next.id} 실패 (${attempts}회):`, message);
