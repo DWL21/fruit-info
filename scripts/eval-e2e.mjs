@@ -53,7 +53,12 @@ console.error(`업로드 ${results.filter((r) => r.photoId).length}/${samples.le
 const deadline = Date.now() + Math.max(10, samples.length) * 60_000;
 for (const r of results.filter((x) => x.photoId)) {
   while (Date.now() < deadline) {
-    const { photo, observations } = await api(`/api/admin/photos/${r.photoId}`);
+    const got = await api(`/api/admin/photos/${r.photoId}`).catch(() => null);
+    if (!got) {
+      await new Promise((res) => setTimeout(res, 10_000));
+      continue;
+    }
+    const { photo, observations } = got;
     if (photo.status === 'done' || photo.status === 'failed') {
       r.photo = photo;
       r.obs = observations;
