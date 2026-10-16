@@ -22,6 +22,7 @@ interface Job {
   blob: Blob;
   preview: string;
   takenAt: string;
+  autoStore: boolean;
   state: 'waiting' | 'uploading' | 'sent' | 'error';
   error?: string;
 }
@@ -119,10 +120,10 @@ function Shooter() {
   }, []);
 
   const enqueue = useCallback(
-    (blob: Blob, takenAt: string) => {
+    (blob: Blob, takenAt: string, autoStore = false) => {
       if (!current) return;
       setJobs((js) => [
-        { id: crypto.randomUUID(), storeId: current.id, storeName: current.name, blob, preview: URL.createObjectURL(blob), takenAt, state: 'waiting' },
+        { id: crypto.randomUUID(), storeId: current.id, storeName: autoStore ? '간판 자동' : current.name, blob, preview: URL.createObjectURL(blob), takenAt, autoStore, state: 'waiting' },
         ...js,
       ]);
     },
@@ -145,9 +146,10 @@ function Shooter() {
     for (const f of Array.from(files)) {
       const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' }).catch(() => null);
       if (!bmp) continue;
-      enqueue(await toJpeg(bmp, bmp.width, bmp.height), new Date(f.lastModified || Date.now()).toISOString());
+      // 앨범에서 고른 사진은 간판으로 가게를 정한다.
+      enqueue(await toJpeg(bmp, bmp.width, bmp.height), new Date(f.lastModified || Date.now()).toISOString(), true);
+      track('shoot_capture', { store_id: current?.id ?? null, source: 'album' });
     }
-    if (auto) go(idx + 1);
   };
 
   // ---- 업로드 큐 (한 번에 하나씩, 실패하면 다시 시도) ----
@@ -159,7 +161,7 @@ function Shooter() {
     busy.current = true;
     setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'uploading' } : j)));
     adminApi
-      .upload(job.blob, job.storeId, job.takenAt)
+      .upload(job.blob, job.storeId, job.takenAt, job.autoStore)
       .then(() => {
         track('upload_done', { store_id: job.storeId });
         setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'sent' } : j)));

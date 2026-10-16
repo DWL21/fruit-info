@@ -1,4 +1,4 @@
-import { matchCatalog } from '@fruit/shared';
+import { matchCatalog, walkKey, type Aisle, type Side } from '@fruit/shared';
 import { analyze } from './analyzer.ts';
 import { db } from './db.ts';
 import { live } from './live.ts';
@@ -8,6 +8,24 @@ import { config } from './config.ts';
 import { capture } from './monitor.ts';
 
 let running = 0;
+
+const normName = (s: string) => s.replace(/[\s()·.]/g, '').toLowerCase();
+
+interface StoreRef { id: number; name: string; aisle: Aisle; position: number; side: Side }
+
+/** 읽은 간판 이름으로 가게를 찾는다. 동명 가게는 선택 가게와 동선상 가까운 곳, 없으면 선택 가게. */
+export function resolveStore(readName: string | null, selectedId: number): number {
+  if (!readName) return selectedId;
+  const stores = db.prepare('SELECT id, name, aisle, position, side FROM stores WHERE active = 1').all() as StoreRef[];
+  const target = normName(readName);
+  const matches = stores.filter((s) => normName(s.name) === target);
+  if (!matches.length) return selectedId;
+  if (matches.some((s) => s.id === selectedId)) return selectedId;
+  const selected = stores.find((s) => s.id === selectedId);
+  if (!selected) return matches[0]!.id;
+  const k = walkKey(selected);
+  return matches.sort((a, b) => Math.abs(walkKey(a) - k) - Math.abs(walkKey(b) - k))[0]!.id;
+}
 
 function emitPhoto(id: string) {
   const photo = getPhoto(id);
@@ -20,16 +38,23 @@ async function processOne(): Promise<boolean> {
     .prepare(
       `UPDATE photos SET status = 'analyzing', attempts = attempts + 1
        WHERE id = (SELECT id FROM photos WHERE status = 'queued' ORDER BY taken_at LIMIT 1)
-       RETURNING id, store_id, taken_at`,
+       RETURNING id, store_id, taken_at, auto_store`,
     )
-    .get() as { id: string; store_id: number; taken_at: string } | undefined;
+    .get() as { id: string; store_id: number; taken_at: string; auto_store: number } | undefined;
   if (!next) return false;
   emitPhoto(next.id);
   const store = db.prepare('SELECT name FROM stores WHERE id = ?').get(next.store_id) as { name: string };
 
   try {
-    const result = await analyze(originalPath(next.id), store.name);
+    const result = await analyze(originalPath(next.id), next.auto_store ? null : store.name);
     const { analysis } = result;
+    if (next.auto_store) {
+      const resolved = resolveStore(analysis.store_name, next.store_id);
+      if (resolved !== next.store_id) {
+        db.prepare('UPDATE photos SET store_id = ? WHERE id = ?').run(resolved, next.id);
+        next.store_id = resolved;
+      }
+    }
     await publishPhoto(next.id, analysis.faces);
 
     const insert = db.prepare(

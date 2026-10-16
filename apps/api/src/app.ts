@@ -174,6 +174,7 @@ admin.post('/photos', async (c) => {
   const file = form?.get('photo');
   const storeId = Number(form?.get('storeId'));
   const takenAtRaw = String(form?.get('takenAt') ?? '');
+  const autoStore = form?.get('autoStore') === '1' ? 1 : 0;
   if (!(file instanceof File)) return fail(c, 400, 'invalid', '사진이 없습니다.');
   if (file.size > 15_000_000) return fail(c, 413, 'too_large', '사진이 너무 큽니다 (15MB 이하).');
   if (!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type)) return fail(c, 415, 'unsupported', '지원하지 않는 사진 형식입니다.');
@@ -183,7 +184,7 @@ admin.post('/photos', async (c) => {
   const id = randomUUID();
   const { width, height } = await saveOriginal(id, Buffer.from(await file.arrayBuffer())).catch(() => ({ width: 0, height: 0 }));
   if (!width) return fail(c, 415, 'unsupported', '사진을 읽을 수 없습니다.');
-  db.prepare('INSERT INTO photos (id, store_id, width, height, taken_at) VALUES (?, ?, ?, ?, ?)').run(id, storeId, width, height, takenAt);
+  db.prepare('INSERT INTO photos (id, store_id, width, height, taken_at, auto_store) VALUES (?, ?, ?, ?, ?, ?)').run(id, storeId, width, height, takenAt, autoStore);
   kickQueue();
   return c.json({ data: repo.getPhoto(id) }, 202);
 });
