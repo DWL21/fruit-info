@@ -9,3 +9,4 @@ data/
 .wrangler
 .DS_Store
 .claude/
+samples/

@@ -5,6 +5,7 @@ import { adminApi, api, operatorKey, type ApiError } from '../lib/api.ts';
 import { Link } from '../components/Link.tsx';
 import { track } from '../lib/analytics.ts';
 import { outbox } from '../lib/outbox.ts';
+import { DoneToast, ProblemAlert, problemsOf, type Notice } from '../components/ShootNotices.tsx';
 
 /** 촬영 결과를 최대 2560px JPEG로 만든다. 캔버스를 거치며 EXIF(GPS 등)가 제거된다. */
 async function toJpeg(source: CanvasImageSource, w: number, h: number): Promise<Blob> {
@@ -30,6 +31,27 @@ interface Job {
 }
 
 const IDX_KEY = 'fruit.shootIndex';
+// 분석을 기다리는 내 사진 { photoId: 간판 인식 여부 } — 새로고침해도 알림을 놓치지 않게 저장한다.
+const WATCH_KEY = 'fruit.shootWatch';
+const readWatch = (): Record<string, boolean> => {
+  try {
+    return JSON.parse(localStorage.getItem(WATCH_KEY) ?? '{}') as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+};
+const writeWatch = (w: Record<string, boolean>) => {
+  try {
+    localStorage.setItem(WATCH_KEY, JSON.stringify(w));
+  } catch {
+    /* 저장 불가 */
+  }
+};
+const watchPhoto = (id: string, autoStore: boolean) => {
+  const w = readWatch();
+  w[id] = autoStore;
+  writeWatch(w);
+};
 const AUTO_NEXT_KEY = 'fruit.shootAutoNext';
 const SIGN_KEY = 'fruit.shootSign';
 const readFlag = (k: string, d: boolean) => {
@@ -221,7 +243,8 @@ function Shooter() {
     setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'uploading' } : j)));
     adminApi
       .upload(job.blob, job.storeId, job.takenAt, job.autoStore)
-      .then(() => {
+      .then((photo) => {
+        watchPhoto(photo.id, job.autoStore);
         track('upload_done', { store_id: job.storeId });
         void outbox.remove(job.id);
         setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'sent' } : j)));
@@ -249,6 +272,28 @@ function Shooter() {
   }, [pending]);
 
   const photos = useQuery({ queryKey: ['admin-photos'], queryFn: adminApi.photos, refetchInterval: 4000 });
+
+  // 이 기기에서 올린 사진의 분석이 끝나면 알린다. 문제가 있으면 경고창.
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [openPhoto, setOpenPhoto] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photos.data) return;
+    const watching = readWatch();
+    const finished = photos.data.filter((p) => watching[p.id] !== undefined && (p.status === 'done' || p.status === 'failed'));
+    if (!finished.length) return;
+    const added = finished.map((p) => ({ photo: p, problems: problemsOf(p, !!watching[p.id]) }));
+    for (const p of finished) delete watching[p.id];
+    writeWatch(watching);
+    setNotices((ns) => [...ns, ...added]);
+  }, [photos.data]);
+  const toasts = notices.filter((n) => !n.problems.length).slice(-3);
+  const alert = notices.find((n) => n.problems.length);
+  const dismiss = (id: string) => setNotices((ns) => ns.filter((n) => n.photo.id !== id));
+  const openResult = (id: string) => {
+    dismiss(id);
+    setOpenPhoto(id);
+    setPanel('results');
+  };
   const analyzing = photos.data?.filter((p) => p.status === 'queued' || p.status === 'analyzing').length ?? 0;
   const reviewing = photos.data?.reduce((n, p) => n + p.reviewCount, 0) ?? 0;
 
@@ -315,8 +360,17 @@ function Shooter() {
         </div>
       </div>
 
+      {toasts.length > 0 && panel === 'none' && (
+        <div className="fixed inset-x-3 top-[calc(max(env(safe-area-inset-top),12px)+64px)] z-30 space-y-2">
+          {toasts.map((n) => (
+            <DoneToast key={n.photo.id} notice={n} onOpen={() => openResult(n.photo.id)} onDismiss={() => dismiss(n.photo.id)} />
+          ))}
+        </div>
+      )}
+      {alert && <ProblemAlert notice={alert} onOpen={() => openResult(alert.photo.id)} onClose={() => dismiss(alert.photo.id)} />}
+
       {panel === 'stores' && <StoresPanel stores={list} currentId={current?.id} onPick={(i) => (go(i), setPanel('none'))} onClose={() => setPanel('none')} />}
-      {panel === 'results' && <ResultsPanel stores={list} photos={photos.data ?? []} jobs={jobs} retry={(id) => setJobs((js) => js.map((j) => (j.id === id ? { ...j, state: 'waiting' } : j)))} discard={(id) => (void outbox.remove(id), setJobs((js) => js.filter((j) => j.id !== id)))} onClose={() => setPanel('none')} />}
+      {panel === 'results' && <ResultsPanel initialOpen={openPhoto} stores={list} photos={photos.data ?? []} jobs={jobs} retry={(id) => setJobs((js) => js.map((j) => (j.id === id ? { ...j, state: 'waiting' } : j)))} discard={(id) => (void outbox.remove(id), setJobs((js) => js.filter((j) => j.id !== id)))} onClose={() => (setPanel('none'), setOpenPhoto(null))} />}
     </div>
   );
 }
@@ -443,8 +497,8 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
 
 const statusLabel: Record<Photo['status'], string> = { queued: '대기', analyzing: '분석 중', done: '게시됨', failed: '실패' };
 
-function ResultsPanel({ stores, photos, jobs, retry, discard, onClose }: { stores: Store[]; photos: Photo[]; jobs: Job[]; retry: (id: string) => void; discard: (id: string) => void; onClose: () => void }) {
-  const [open, setOpen] = useState<string | null>(null);
+function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClose }: { initialOpen: string | null; stores: Store[]; photos: Photo[]; jobs: Job[]; retry: (id: string) => void; discard: (id: string) => void; onClose: () => void }) {
+  const [open, setOpen] = useState<string | null>(initialOpen);
   const failedJobs = jobs.filter((j) => j.state === 'error');
   return (
     <Sheet title="분석 결과" onClose={onClose}>
