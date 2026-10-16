@@ -42,6 +42,7 @@ const CURRENT_SQL = `
   WITH visible AS (
     SELECT o.* FROM observations o
     WHERE o.hidden = 0 AND o.observed_at >= @since
+      AND o.photo_id IN (SELECT id FROM photos WHERE sample = 0)
   ),
   latest AS (
     SELECT store_id, item_slug, MAX(observed_at) AS last_at FROM visible GROUP BY store_id, item_slug
@@ -99,7 +100,7 @@ export function listStores(): Store[] {
   const rows = db
     .prepare(
       `SELECT s.id, s.name, s.aisle, s.position, s.side, s.address, s.stall_no, s.note,
-              (SELECT MAX(taken_at) FROM photos p WHERE p.store_id = s.id AND p.status = 'done') AS last_photo_at
+              (SELECT MAX(taken_at) FROM photos p WHERE p.store_id = s.id AND p.status = 'done' AND p.sample = 0) AS last_photo_at
        FROM stores s WHERE s.active = 1`,
     )
     .all() as StoreRow[];
@@ -129,17 +130,24 @@ const toPhoto = (r: PhotoRow): Photo => ({
   durationMs: r.duration_ms, takenAt: r.taken_at,
 });
 
+export function isSample(id: string): boolean {
+  return !!(db.prepare('SELECT sample FROM photos WHERE id = ?').pluck().get(id) as number | undefined);
+}
+
 export function getPhoto(id: string): Photo | null {
   const row = db.prepare(`${PHOTO_SQL} WHERE p.id = ?`).get(id) as PhotoRow | undefined;
   return row ? toPhoto(row) : null;
 }
 
-export function listPhotos(opts: { storeId?: number; status?: 'done'; limit?: number } = {}): Photo[] {
+/** publicOnly: 평가용(sample) 사진을 뺀다 */
+export function listPhotos(opts: { storeId?: number; status?: 'done'; limit?: number; publicOnly?: boolean; sample?: boolean } = {}): Photo[] {
   const where: string[] = [];
+  if (opts.publicOnly) where.push('p.sample = 0');
+  if (opts.sample) where.push('p.sample = 1');
   if (opts.storeId) where.push('p.store_id = @storeId');
   if (opts.status) where.push('p.status = @status');
   const sql = `${PHOTO_SQL} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY p.taken_at DESC LIMIT @limit`;
-  return (db.prepare(sql).all({ ...opts, limit: opts.limit ?? 30 }) as PhotoRow[]).map(toPhoto);
+  return (db.prepare(sql).all({ storeId: opts.storeId, status: opts.status, limit: opts.limit ?? 30 }) as PhotoRow[]).map(toPhoto);
 }
 
 /** includeReview: 운영자 화면에서 확인 대기 항목도 함께 본다. */
@@ -160,7 +168,7 @@ export function itemHistory(itemSlug: string) {
   return db
     .prepare(
       `SELECT substr(datetime(observed_at, '+9 hours'), 1, 10) AS day, MIN(price) AS min_price, COUNT(DISTINCT store_id) AS stores
-       FROM observations WHERE item_slug = ? AND hidden = 0 GROUP BY day ORDER BY day DESC LIMIT 30`,
+       FROM observations WHERE item_slug = ? AND hidden = 0 AND photo_id IN (SELECT id FROM photos WHERE sample = 0) GROUP BY day ORDER BY day DESC LIMIT 30`,
     )
     .all(itemSlug) as { day: string; min_price: number; stores: number }[];
 }
@@ -169,7 +177,7 @@ export function itemHistory(itemSlug: string) {
 export function feed(limit: number, before?: string) {
   const rows = db
     .prepare(
-      `${PHOTO_SQL} WHERE p.status != 'failed' AND s.active = 1 ${before ? 'AND p.taken_at < @before' : ''} ORDER BY p.taken_at DESC LIMIT @limit`,
+      `${PHOTO_SQL} WHERE p.status != 'failed' AND p.sample = 0 AND s.active = 1 ${before ? 'AND p.taken_at < @before' : ''} ORDER BY p.taken_at DESC LIMIT @limit`,
     )
     .all({ limit, before }) as PhotoRow[];
   return rows.map((r) => {
