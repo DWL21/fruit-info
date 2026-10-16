@@ -30,13 +30,15 @@ export const OUTPUT_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'variety', 'price', 'unit', 'confidence', 'price_box', 'product_box'],
+        required: ['name', 'name_source', 'product_desc', 'variety', 'price', 'unit', 'confidence', 'price_box', 'product_box'],
         properties: {
           name: { type: 'string' },
           variety: { type: ['string', 'null'] },
           price: { type: ['integer', 'null'] },
           unit: { type: ['string', 'null'] },
           confidence: { type: 'number' },
+          name_source: { type: 'string', enum: ['tag', 'product'] },
+          product_desc: { type: 'string' },
           price_box: box,
           product_box: box,
         },
@@ -56,6 +58,13 @@ export function buildPrompt(storeName: string | null) {
   - variety: 품종·산지·상태(예: 하우스, 부사, 성주). 없으면 null.
   - price: 원 단위 정수. 손글씨 가격표가 많다. 취소선이 그어진 이전 가격은 버리고 새로 적힌 가격을 쓴다. 쉼표·'원'·'₩' 표기는 무시. 읽을 수 없으면 null.
   - 과일 이름이 가려졌거나 축약(예: '포', '꿀천도')돼도 가격표가 가리키는 진열 상품을 보고 과일 이름을 정한다.
+  - name_source: 가격표에 과일 이름 글자가 있으면 'tag', 글자가 없어 진열 상품 외형으로 판단했으면 'product'.
+  - product_desc: 가격표가 가리키는 진열 상품의 외형(색·모양·크기·포장)을 짧게. 예: '흰 그물망에 싸인 연두색 둥근 과일'.
+  - 외형으로 판단할 때 자주 헷갈리는 과일 구분:
+    · 흰 스티로폼/그물망에 하나씩 싸인 크고 둥근 연두·노란 과일 = 멜론(머스크멜론·하미과). 배는 갈색 껍질에 종이 봉지·과일망, 참외는 노란 바탕에 흰 골.
+    · 짙은 녹색~흑갈색, 울퉁불퉁하고 손바닥만 한 타원형 = 아보카도. 사과·자두는 매끈하고 빨갛다.
+    · 털이 있는 갈색 작은 타원형 = 키위, 매끈한 노란 속 = 골드키위.
+    · 확실하지 않으면 confidence를 0.5 이하로.
   - unit: 판매 단위(예: 1박스, 1판, 1줄, 3개, 1kg, 1봉). 없으면 null.
   - confidence: 0~1.
   - price_box: 그 가격표의 위치. product_box: 그 가격표가 가리키는 진열 상품(상자·바구니·더미) 위치. 연결이 불명확하면 product_box는 null.

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import sharp from 'sharp';
 import { matchCatalog } from '@fruit/shared';
 import { analyze } from './analyzer.ts';
+import { needsReview } from './publish.ts';
 
 interface Sample {
   id: string;
@@ -31,7 +32,7 @@ const { samples } = JSON.parse(await readFile(new URL('../eval/dataset.json', im
 const cache = join(process.env.EVAL_CACHE ?? tmpdir(), 'fruit-eval');
 await mkdir(cache, { recursive: true });
 
-let tp = 0, fn = 0, fp = 0, storeOk = 0, storeTotal = 0, negFp = 0, negTotal = 0;
+let tp = 0, fn = 0, fp = 0, storeOk = 0, storeTotal = 0, negFp = 0, negTotal = 0, held = 0;
 const durations: number[] = [];
 const lines: string[] = [];
 for (const s of samples) {
@@ -39,7 +40,10 @@ for (const s of samples) {
     const path = await fetchImage(s.url, cache, s.id);
     const r = await analyze(path, s.store);
     durations.push(r.durationMs);
+    // 공개되는 항목만 채점한다. 확인 대기 항목은 따로 센다.
+    held += r.analysis.items.filter((it) => needsReview(it)).length;
     const got = r.analysis.items
+      .filter((it) => !needsReview(it))
       .map((it) => ({ item: matchCatalog(it.name, it.variety)?.slug ?? null, price: it.price, raw: `${it.name}${it.variety ? `(${it.variety})` : ''} ${it.price ?? '?'}` }))
       .filter((g) => g.item && g.price);
     const left = [...got];
@@ -76,6 +80,7 @@ const report = `# 분석 정확도 평가 ${new Date(Date.now() + 9 * 3600_000).
 - 정밀도(뽑은 것 중 정답): **${pct(tp, tp + fp)}** — 정답에 없는 추가 검출 ${fp}건(배경 가격표 포함)
 - 간판 인식: **${pct(storeOk, storeTotal)}** (${storeOk}/${storeTotal})
 - 가격표 없는 사진 오탐: ${negFp}/${negTotal}
+- 운영자 확인 대기(공개 안 함): ${held}건
 - 평균 분석 시간: ${durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 1000) : '—'}초
 
 | 샘플 | 맞춤 | 추가 | 읽은 간판 | 시간 | 읽은 시세 |

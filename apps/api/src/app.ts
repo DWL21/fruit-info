@@ -193,7 +193,7 @@ admin.get('/photos', (c) => c.json({ data: repo.listPhotos({ limit: Number(c.req
 admin.get('/photos/:id', (c) => {
   const photo = repo.getPhoto(c.req.param('id'));
   if (!photo) return fail(c, 404, 'not_found', '없는 사진입니다.');
-  return c.json({ data: { photo, observations: repo.photoObservations(photo.id) } });
+  return c.json({ data: { photo, observations: repo.photoObservations(photo.id, true) } });
 });
 admin.post('/photos/:id/reanalyze', (c) => {
   const r = db.prepare(`UPDATE photos SET status = 'queued', attempts = 0, error = NULL WHERE id = ? AND status IN ('done','failed')`).run(c.req.param('id'));
@@ -206,14 +206,14 @@ admin.patch('/observations/:id', async (c) => {
   const parsed = ObservationPatch.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return fail(c, 400, 'invalid', parsed.error.issues[0]?.message ?? '입력을 확인하세요.');
   const id = Number(c.req.param('id'));
-  const { hidden, itemSlug, price, unit } = parsed.data;
+  const { hidden, review, itemSlug, price, unit } = parsed.data;
   if (itemSlug && !CATALOG.some((i) => i.slug === itemSlug)) return fail(c, 400, 'invalid', '없는 과일입니다.');
   const row = db.prepare('SELECT store_id, item_slug FROM observations WHERE id = ?').get(id) as { store_id: number; item_slug: string } | undefined;
   if (!row) return fail(c, 404, 'not_found', '없는 시세입니다.');
   db.prepare(
-    `UPDATE observations SET hidden = COALESCE(?, hidden), item_slug = COALESCE(?, item_slug), price = COALESCE(?, price),
+    `UPDATE observations SET hidden = COALESCE(?, hidden), review = COALESCE(?, review), item_slug = COALESCE(?, item_slug), price = COALESCE(?, price),
      unit = CASE WHEN ? THEN ? ELSE unit END WHERE id = ?`,
-  ).run(hidden === undefined ? null : Number(hidden), itemSlug ?? null, price ?? null, unit !== undefined ? 1 : 0, unit ?? null, id);
+  ).run(hidden === undefined ? null : Number(hidden), review === undefined ? null : Number(review), itemSlug ?? null, price ?? null, unit !== undefined ? 1 : 0, unit ?? null, id);
   live.publish({ type: 'prices', storeId: row.store_id, itemSlugs: [...new Set([row.item_slug, itemSlug].filter((s): s is string => !!s))] });
   return c.json({ data: { ok: true } });
 });

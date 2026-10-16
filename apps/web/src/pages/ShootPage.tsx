@@ -396,24 +396,39 @@ function ResultsPanel({ photos, jobs, retry, onClose }: { photos: Photo[]; jobs:
 function PhotoReview({ id }: { id: string }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['admin-photo', id], queryFn: () => adminApi.photo(id) });
-  const hide = useMutation({
-    mutationFn: (obsId: number) => adminApi.patchObservation(obsId, { hidden: true }),
+  const patch = useMutation({
+    mutationFn: ({ obsId, ...body }: { obsId: number; hidden?: boolean; review?: boolean; itemSlug?: string }) => adminApi.patchObservation(obsId, body),
     onSuccess: () => void qc.invalidateQueries(),
   });
   const reanalyze = useMutation({ mutationFn: () => adminApi.reanalyze(id), onSuccess: () => void qc.invalidateQueries() });
   if (!q.data) return <p className="p-3 text-sm text-chrome">불러오는 중…</p>;
   return (
-    <div className="border-t border-stone-100 p-3">
+    <div className="border-t border-platinum p-3">
       <ul className="space-y-2">
         {q.data.observations.map((o) => (
-          <li key={o.id} className="flex items-center gap-2">
+          <li key={o.id} className={`flex flex-wrap items-center gap-2 ${o.review ? 'rounded-lg bg-amber/30 p-1.5' : ''}`}>
             {o.cropUrl ? <img src={o.cropUrl} alt="" className="size-14 rounded object-cover" /> : <span className="size-14 rounded bg-platinum" />}
-            <span className="flex-1 text-sm">
-              <b>{CATALOG.find((c) => c.slug === o.itemSlug)?.name}</b> {o.variety ?? ''} · {won(o.price)}
+            <span className="min-w-0 flex-1 text-sm">
+              {o.review && <span className="chip-amber mr-1 px-1 text-[11px]">확인 대기</span>}
+              <label className="sr-only" htmlFor={`fruit-${o.id}`}>과일</label>
+              <select
+                id={`fruit-${o.id}`}
+                value={o.itemSlug}
+                onChange={(e) => patch.mutate({ obsId: o.id, itemSlug: e.target.value })}
+                className="field mr-1 min-h-9 px-1 font-bold"
+              >
+                {CATALOG.map((c) => (
+                  <option key={c.slug} value={c.slug}>{c.name}</option>
+                ))}
+              </select>
+              {o.variety ?? ''} · {won(o.price)}
               {o.unit && `/${o.unit}`}
               <span className="block text-xs text-chrome">읽은 글자: {o.rawName} · 신뢰도 {Math.round(o.confidence * 100)}%</span>
             </span>
-            <button onClick={() => hide.mutate(o.id)} className="min-h-10 rounded-lg px-2 text-xs text-red-600 ring-1 ring-red-200">숨기기</button>
+            {o.review && (
+              <button onClick={() => patch.mutate({ obsId: o.id, hidden: false, review: false })} className="btn-signal min-h-10 px-3 text-xs">게시</button>
+            )}
+            <button onClick={() => patch.mutate({ obsId: o.id, hidden: true, review: false })} className="min-h-10 rounded-lg px-2 text-xs text-red-600 ring-1 ring-red-200">숨기기</button>
           </li>
         ))}
       </ul>

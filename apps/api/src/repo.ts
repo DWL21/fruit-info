@@ -8,7 +8,7 @@ const since = () => new Date(Date.now() - VISIBLE_DAYS * 86400_000).toISOString(
 interface ObsRow {
   id: number; item_slug: string; store_id: number; store_name: string; aisle: Aisle; position: number; side: 'A' | 'B'; address: string | null;
   raw_name: string; variety: string | null; price: number; unit: string | null; confidence: number;
-  photo_id: string; crop: number; price_box: string | null; product_box: string | null; observed_at: string;
+  photo_id: string; crop: number; price_box: string | null; product_box: string | null; observed_at: string; review?: number;
 }
 
 const toObservation = (r: ObsRow): Observation => ({
@@ -25,6 +25,7 @@ const toObservation = (r: ObsRow): Observation => ({
   price: r.price,
   unit: r.unit,
   confidence: r.confidence,
+  ...(r.review ? { review: true } : {}),
   photoId: r.photo_id,
   photoUrl: photoUrl(r.photo_id),
   cropUrl: r.crop ? cropUrl(r.id) : null,
@@ -140,14 +141,16 @@ export function listPhotos(opts: { storeId?: number; status?: 'done'; limit?: nu
   return (db.prepare(sql).all({ ...opts, limit: opts.limit ?? 30 }) as PhotoRow[]).map(toPhoto);
 }
 
-export function photoObservations(photoId: string): Observation[] {
+/** includeReview: 운영자 화면에서 확인 대기 항목도 함께 본다. */
+export function photoObservations(photoId: string, includeReview = false): Observation[] {
   const rows = db
     .prepare(
       `SELECT o.id, o.item_slug, o.store_id, s.name AS store_name, s.aisle, s.position, s.side, s.address, o.raw_name, o.variety, o.price, o.unit,
-              o.confidence, o.photo_id, o.crop, o.price_box, o.product_box, o.observed_at
-       FROM observations o JOIN stores s ON s.id = o.store_id WHERE o.photo_id = ? AND o.hidden = 0 ORDER BY o.id`,
+              o.confidence, o.photo_id, o.crop, o.price_box, o.product_box, o.observed_at, o.review
+       FROM observations o JOIN stores s ON s.id = o.store_id
+       WHERE o.photo_id = ? AND (o.hidden = 0 OR (? AND o.review = 1)) ORDER BY o.review DESC, o.id`,
     )
-    .all(photoId) as ObsRow[];
+    .all(photoId, includeReview ? 1 : 0) as ObsRow[];
   return rows.map(toObservation);
 }
 
