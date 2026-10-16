@@ -1,15 +1,22 @@
 #!/usr/bin/env node
-// GA4 리포트 (CLI). gcloud ADC 로그인(analytics.readonly 범위)이 필요하다.
-//   gcloud auth application-default login --no-launch-browser \
-//     --scopes=https://www.googleapis.com/auth/analytics.readonly,https://www.googleapis.com/auth/cloud-platform
-// 사용: node scripts/ga4-report.mjs [일수=7] [측정ID=G-22GE9YBSG6]
+// GA4 리포트 (CLI).
+// Google이 gcloud 기본 앱의 GA 범위를 막아서, 서비스 계정 위임으로 토큰을 받는다.
+//   1) gcloud auth login (일반 로그인)
+//   2) 서비스 계정에 'Service Account Token Creator' 권한, GA4 속성에 그 계정을 '뷰어'로 추가
+// 사용: GA4_SA=ga4-reader@<project>.iam.gserviceaccount.com [GA4_PROPERTY=123456789] node scripts/ga4-report.mjs [일수=7] [측정ID]
 import { execFileSync } from 'node:child_process';
 
 const days = Number(process.argv[2] ?? 7);
 const measurementId = process.argv[3] ?? process.env.GA_MEASUREMENT_ID ?? 'G-22GE9YBSG6';
 const gcloud = process.env.GCLOUD ?? 'gcloud';
+const sa = process.env.GA4_SA;
+if (!sa) throw new Error('GA4_SA(서비스 계정 이메일)를 지정하세요');
 
-const token = execFileSync(gcloud, ['auth', 'application-default', 'print-access-token'], { encoding: 'utf8' }).trim();
+const token = execFileSync(
+  gcloud,
+  ['auth', 'print-access-token', `--impersonate-service-account=${sa}`, '--scopes=https://www.googleapis.com/auth/analytics.readonly'],
+  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+).trim();
 const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
 async function get(url) {
@@ -19,8 +26,9 @@ async function get(url) {
   return body;
 }
 
-// 측정 ID로 GA4 속성을 찾는다.
+// 측정 ID로 GA4 속성을 찾는다. GA4_PROPERTY(숫자 속성 ID)를 주면 찾지 않고 그 속성을 쓴다.
 async function findProperty() {
+  if (process.env.GA4_PROPERTY) return { id: `properties/${process.env.GA4_PROPERTY.replace(/^properties\//, '')}`, name: 'GA4' };
   const { accountSummaries = [] } = await get('https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200');
   for (const acc of accountSummaries) {
     for (const p of acc.propertySummaries ?? []) {
@@ -28,7 +36,7 @@ async function findProperty() {
       if (dataStreams.some((s) => s.webStreamData?.measurementId === measurementId)) return { id: p.property, name: p.displayName };
     }
   }
-  throw new Error(`${measurementId} 속성을 찾지 못했습니다`);
+  throw new Error(`${measurementId} 속성을 찾지 못했습니다 — 서비스 계정 ${sa}가 GA4 속성 액세스 관리에 뷰어로 있는지 확인하세요 (보이는 계정 ${accountSummaries.length}개)`);
 }
 
 async function report(property, body) {

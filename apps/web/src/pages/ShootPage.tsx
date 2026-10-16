@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AISLES, CATALOG, placeName, sideName, timeAgo, won, type Aisle, type Photo, type Side, type Store } from '@fruit/shared';
-import { adminApi, api, operatorKey } from '../lib/api.ts';
+import { adminApi, api, operatorKey, type ApiError } from '../lib/api.ts';
 import { Link } from '../components/Link.tsx';
 import { track } from '../lib/analytics.ts';
+import { outbox } from '../lib/outbox.ts';
 
 /** 촬영 결과를 최대 2560px JPEG로 만든다. 캔버스를 거치며 EXIF(GPS 등)가 제거된다. */
 async function toJpeg(source: CanvasImageSource, w: number, h: number): Promise<Blob> {
@@ -25,6 +26,7 @@ interface Job {
   autoStore: boolean;
   state: 'waiting' | 'uploading' | 'sent' | 'error';
   error?: string;
+  offline?: boolean;
 }
 
 const IDX_KEY = 'fruit.shootIndex';
@@ -122,13 +124,38 @@ function Shooter() {
   const enqueue = useCallback(
     (blob: Blob, takenAt: string, autoStore = false) => {
       if (!current) return;
-      setJobs((js) => [
-        { id: crypto.randomUUID(), storeId: current.id, storeName: autoStore ? '간판 자동' : current.name, blob, preview: URL.createObjectURL(blob), takenAt, autoStore, state: 'waiting' },
-        ...js,
-      ]);
+      const item = { id: crypto.randomUUID(), storeId: current.id, storeName: autoStore ? '간판 자동' : current.name, blob, takenAt, autoStore };
+      void outbox.put(item);
+      setJobs((js) => [{ ...item, preview: URL.createObjectURL(blob), state: 'waiting' }, ...js]);
     },
     [current],
   );
+
+  // 지난번에 다 못 올린 사진을 이어서 올린다.
+  useEffect(() => {
+    void outbox.all().then((items) => {
+      if (!items.length) return;
+      setJobs((js) => {
+        const known = new Set(js.map((j) => j.id));
+        const restored = items
+          .filter((i) => !known.has(i.id))
+          .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
+          .map((i): Job => ({ ...i, preview: URL.createObjectURL(i.blob), state: 'waiting' }));
+        return [...js, ...restored];
+      });
+    });
+  }, []);
+
+  // 연결이 돌아오면 네트워크 오류로 실패한 업로드를 다시 시도한다.
+  useEffect(() => {
+    const retry = () => setJobs((js) => js.map((j) => (j.state === 'error' && j.offline ? { ...j, state: 'waiting' } : j)));
+    window.addEventListener('online', retry);
+    const timer = setInterval(retry, 20_000);
+    return () => {
+      window.removeEventListener('online', retry);
+      clearInterval(timer);
+    };
+  }, []);
 
   const shoot = async () => {
     const v = video.current;
@@ -164,10 +191,15 @@ function Shooter() {
       .upload(job.blob, job.storeId, job.takenAt, job.autoStore)
       .then(() => {
         track('upload_done', { store_id: job.storeId });
+        void outbox.remove(job.id);
         setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'sent' } : j)));
         void qc.invalidateQueries({ queryKey: ['admin-photos'] });
       })
-      .catch((e: Error) => (track('upload_failed', { store_id: job.storeId }), setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'error', error: e.message } : j)))))
+      .catch((e: ApiError) => {
+        track('upload_failed', { store_id: job.storeId });
+        // 상태 0은 연결 실패: 자동으로 다시 시도한다. 그 밖의 오류는 운영자가 확인한다.
+        setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, state: 'error', error: e.message, offline: e.status === 0 } : j)));
+      })
       .finally(() => {
         busy.current = false;
         setJobs((js) => [...js]);
@@ -249,7 +281,7 @@ function Shooter() {
       </div>
 
       {panel === 'stores' && <StoresPanel stores={list} currentId={current?.id} onPick={(i) => (go(i), setPanel('none'))} onClose={() => setPanel('none')} />}
-      {panel === 'results' && <ResultsPanel photos={photos.data ?? []} jobs={jobs} retry={(id) => setJobs((js) => js.map((j) => (j.id === id ? { ...j, state: 'waiting' } : j)))} onClose={() => setPanel('none')} />}
+      {panel === 'results' && <ResultsPanel photos={photos.data ?? []} jobs={jobs} retry={(id) => setJobs((js) => js.map((j) => (j.id === id ? { ...j, state: 'waiting' } : j)))} discard={(id) => (void outbox.remove(id), setJobs((js) => js.filter((j) => j.id !== id)))} onClose={() => setPanel('none')} />}
     </div>
   );
 }
@@ -354,7 +386,7 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
 
 const statusLabel: Record<Photo['status'], string> = { queued: '대기', analyzing: '분석 중', done: '게시됨', failed: '실패' };
 
-function ResultsPanel({ photos, jobs, retry, onClose }: { photos: Photo[]; jobs: Job[]; retry: (id: string) => void; onClose: () => void }) {
+function ResultsPanel({ photos, jobs, retry, discard, onClose }: { photos: Photo[]; jobs: Job[]; retry: (id: string) => void; discard: (id: string) => void; onClose: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const failedJobs = jobs.filter((j) => j.state === 'error');
   return (
@@ -367,6 +399,7 @@ function ResultsPanel({ photos, jobs, retry, onClose }: { photos: Photo[]; jobs:
               <img src={j.preview} alt="" className="size-10 rounded object-cover" />
               <span className="flex-1 truncate">{j.storeName} · {j.error}</span>
               <button onClick={() => retry(j.id)} className="min-h-10 rounded-lg bg-white px-3 font-semibold">다시</button>
+              <button onClick={() => discard(j.id)} className="min-h-10 rounded-lg px-2 text-xs">버리기</button>
             </div>
           ))}
         </div>
