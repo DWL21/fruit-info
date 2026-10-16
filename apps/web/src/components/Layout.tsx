@@ -4,6 +4,7 @@ import { useLiveUpdates } from '../lib/live.ts';
 
 const tabs = [
   { href: '/', label: '과일 시세', match: (p: string) => p === '/' || p.startsWith('/item') || p.startsWith('/photo') },
+  { href: '/wholesale', label: '도매 시세', match: (p: string) => p.startsWith('/wholesale') },
   { href: '/map', label: '시장 지도', match: (p: string) => p.startsWith('/map') || p.startsWith('/store') },
 ];
 

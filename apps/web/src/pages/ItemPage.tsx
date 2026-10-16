@@ -6,6 +6,7 @@ import { WalkGuide, type GuideMark } from '../components/WalkGuide.tsx';
 import { PriceCard } from '../components/PriceCard.tsx';
 import { Empty, ErrorBox, Loading, SectionTitle } from '../components/States.tsx';
 import { Link } from '../components/Link.tsx';
+import { dayLabel, kindLabel, Sparkline, WholesaleRow } from '../components/Wholesale.tsx';
 
 export function ItemPage({ slug }: { slug: string }) {
   const detail = useQuery({ queryKey: ['item', slug], queryFn: () => api.item(slug) });
@@ -61,6 +62,8 @@ export function ItemPage({ slug }: { slug: string }) {
         </>
       )}
 
+      <ItemWholesale slug={slug} />
+
       {history.length > 1 && (
         <section aria-labelledby="hist-title">
           <SectionTitle id="hist-title">날짜별 최저가</SectionTitle>
@@ -78,5 +81,36 @@ export function ItemPage({ slug }: { slug: string }) {
         </section>
       )}
     </div>
+  );
+}
+
+/** 이 과일의 도매 시세 (KAMIS 서울 도매) */
+function ItemWholesale({ slug }: { slug: string }) {
+  const day = useQuery({ queryKey: ['wholesale', 'latest'], queryFn: () => api.wholesale() });
+  const hist = useQuery({ queryKey: ['wholesale-history', slug], queryFn: () => api.wholesaleHistory(slug) });
+  const item = day.data?.items.find((i) => i.slug === slug);
+  if (!item || !day.data?.day) return null;
+  const main = hist.data?.series.find((s) => s.kind === item.prices[0]!.kind && s.rank === item.prices[0]!.rank);
+  return (
+    <section aria-labelledby="ws-title">
+      <SectionTitle id="ws-title">도매 시세</SectionTitle>
+      <div className="plate-white space-y-1 rounded-t-none p-2.5">
+        <p className="flex justify-between text-[11px] font-bold text-chrome">
+          <span>{dayLabel(day.data.day)}</span>
+          <Link href="/wholesale" className="text-carbon">KAMIS 서울 도매 ›</Link>
+        </p>
+        {item.prices.map((p, k) => (
+          <WholesaleRow key={`${p.kind}${p.rank}`} p={p} big={k === 0} />
+        ))}
+        {main && main.points.length > 1 && (
+          <div className="pt-2">
+            <p className="text-[11px] font-bold text-chrome">
+              {kindLabel(main.kind)} {main.rank} · 최근 {main.points.length}거래일
+            </p>
+            <Sparkline points={main.points} />
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

@@ -67,6 +67,20 @@ const migrations: string[] = [
   `ALTER TABLE photos ADD COLUMN sample INTEGER NOT NULL DEFAULT 0;
    CREATE INDEX photos_sample ON photos(sample);`,
   `ALTER TABLE photos ADD COLUMN held INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE wholesale (
+     day TEXT NOT NULL,
+     item_code TEXT NOT NULL,
+     kind_code TEXT NOT NULL,
+     rank_code TEXT NOT NULL,
+     slug TEXT NOT NULL,
+     kind TEXT NOT NULL,
+     rank TEXT NOT NULL,
+     unit TEXT NOT NULL,
+     price INTEGER NOT NULL,
+     PRIMARY KEY (day, item_code, kind_code, rank_code)
+   );
+   CREATE INDEX wholesale_slug ON wholesale(slug, day);
+   CREATE TABLE wholesale_days (day TEXT PRIMARY KEY, rows INTEGER NOT NULL, fetched_at TEXT NOT NULL);`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (id INTEGER PRIMARY KEY)');

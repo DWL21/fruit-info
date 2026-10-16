@@ -1,4 +1,4 @@
-import type { ItemSummary, Observation, Photo, Store, StoreInput, ObservationPatch } from '@fruit/shared';
+import type { ItemSummary, Observation, Photo, Store, StoreInput, ObservationPatch, WholesaleDay, WholesaleHistory } from '@fruit/shared';
 
 export interface FeedEntry {
   photo: Photo;
@@ -37,6 +37,8 @@ export const api = {
   feed: (before?: string) => request<FeedEntry[]>(`/api/feed?limit=12${before ? `&before=${encodeURIComponent(before)}` : ''}`),
   item: (slug: string) => request<ItemDetail>(`/api/items/${slug}`),
   stores: () => request<Store[]>('/api/stores'),
+  wholesale: (day?: string) => request<WholesaleDay>(`/api/wholesale${day ? `?day=${day}` : ''}`),
+  wholesaleHistory: (slug: string) => request<WholesaleHistory>(`/api/wholesale/${slug}`),
   store: (id: number) => request<{ store: Store; observations: Observation[]; photos: Photo[] }>(`/api/stores/${id}`),
   photo: (id: string) => request<{ photo: Photo; observations: Observation[] }>(`/api/photos/${id}`),
 };
