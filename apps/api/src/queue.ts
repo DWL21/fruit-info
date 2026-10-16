@@ -39,7 +39,7 @@ async function processOne(): Promise<boolean> {
   const next = db
     .prepare(
       `UPDATE photos SET status = 'analyzing', attempts = attempts + 1
-       WHERE id = (SELECT id FROM photos WHERE status = 'queued' ORDER BY taken_at LIMIT 1)
+       WHERE id = (SELECT id FROM photos WHERE status = 'queued' ORDER BY sample ASC, taken_at LIMIT 1)
        RETURNING id, store_id, taken_at, auto_store`,
     )
     .get() as { id: string; store_id: number; taken_at: string; auto_store: number } | undefined;

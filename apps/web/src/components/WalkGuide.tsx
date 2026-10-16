@@ -100,10 +100,12 @@ export function WalkGuide({ stores, marks, sticky = false, initialSegment }: { s
 
   const jump = useCallback(
     (i: number, smooth = true) => {
-      const el = refs.current.get(i) ?? refs.current.get(segments.find((g) => g.i >= i)?.i ?? -1);
+      // 보이지 않는 구간을 누르면 가장 가까운 보이는 구간으로
+      const near = [...segments].sort((a, b) => Math.abs(a.i - i) - Math.abs(b.i - i))[0];
+      const el = refs.current.get(i) ?? (near ? refs.current.get(near.i) : undefined);
       if (!el) return;
       window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - line() + 4, behavior: smooth ? 'smooth' : 'auto' });
-      setActive(i);
+      setActive(refs.current.has(i) ? i : (near?.i ?? i));
     },
     [segments, line],
   );

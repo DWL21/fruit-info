@@ -102,7 +102,7 @@ export function MiniMap({
                 {i + 1}
               </text>
               {on && <rect x={x1 + 0.5} y={LABEL_Y + 3} width={x2 - x1 - 1} height={southRoadY - LABEL_Y - 3} rx="2" fill="none" stroke="var(--color-signal)" strokeWidth="1.4" />}
-              {onPick && shown && (
+              {onPick && (
                 <rect
                   x={x1}
                   y={0}
