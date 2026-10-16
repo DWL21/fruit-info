@@ -126,6 +126,7 @@ export const Photo = z.object({
   takenAt: z.string(),
   /** 매대 사진이 아니고 시세도 없어 공개하지 않고 보류 중 */
   held: z.boolean(),
+  likes: z.number(),
 });
 export type Photo = z.infer<typeof Photo>;
 

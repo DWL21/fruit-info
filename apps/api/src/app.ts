@@ -27,10 +27,12 @@ function isOperator(key: string | undefined) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+const clientIp = (c: Context) => c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+
 export const app = new Hono();
 
 app.use('*', secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
-app.use('/api/*', cors({ origin: config.corsOrigins, allowHeaders: ['content-type', 'x-upload-key'], allowMethods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
+app.use('/api/*', cors({ origin: config.corsOrigins, allowHeaders: ['content-type', 'x-upload-key', 'x-client-id'], allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] }));
 app.onError((err, c) => {
   console.error(err);
   capture(err, { path: c.req.path });
@@ -90,7 +92,6 @@ app.get('/api/stores/:id', (c) => {
     },
   });
 });
-// 홈 피드: 최신 매대 사진. 분석 전 사진은 흐린 미리보기로 바로 보인다.
 app.get('/api/wholesale', (c) => {
   const day = c.req.query('day');
   return c.json({ data: wholesaleDay(day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : undefined) });
@@ -101,15 +102,48 @@ app.get('/api/wholesale/:slug', (c) => {
   return c.json({ data: wholesaleHistory(slug) });
 });
 
+/** 좋아요를 누른 기기 (브라우저에 저장한 무작위 id, 개인정보 없음) */
+const clientId = (c: Context) => {
+  const id = c.req.header('x-client-id') ?? '';
+  return /^[a-zA-Z0-9-]{16,64}$/.test(id) ? id : undefined;
+};
+
 app.get('/api/feed', (c) => {
   const limit = Math.min(30, Math.max(1, Number(c.req.query('limit') ?? 12)));
-  const before = c.req.query('before');
-  return c.json({ data: repo.feed(limit, before) });
+  const sort = c.req.query('sort') === 'popular' ? 'popular' : 'latest';
+  return c.json({ data: repo.feed(limit, { sort, before: c.req.query('before'), offset: Number(c.req.query('offset') ?? 0) || 0, clientId: clientId(c) }) });
 });
+
+// 좋아요: 같은 접속지에서 10분에 LIKE_LIMIT번까지
+const LIKE_LIMIT = 120;
+const likeHits = new Map<string, { n: number; since: number }>();
+function likeAllowed(ip: string, now = Date.now()) {
+  const h = likeHits.get(ip);
+  if (!h || now - h.since > 10 * 60_000) {
+    likeHits.set(ip, { n: 1, since: now });
+    return true;
+  }
+  return ++h.n <= LIKE_LIMIT;
+}
+const likeCount = (id: string) => db.prepare('SELECT COUNT(*) FROM likes WHERE photo_id = ?').pluck().get(id) as number;
+for (const method of ['PUT', 'DELETE'] as const) {
+  app.on(method, '/api/photos/:id/like', (c) => {
+    const id = c.req.param('id');
+    const cid = clientId(c);
+    if (!cid) return fail(c, 400, 'invalid', '잘못된 요청입니다.');
+    if (!repo.isPublished(id)) return fail(c, 404, 'not_found', '없는 사진입니다.');
+    if (!likeAllowed(clientIp(c))) return fail(c, 429, 'too_many', '잠시 후 다시 시도하세요.');
+    if (method === 'PUT') db.prepare('INSERT OR IGNORE INTO likes (photo_id, client_id, created_at) VALUES (?, ?, ?)').run(id, cid, now());
+    else db.prepare('DELETE FROM likes WHERE photo_id = ? AND client_id = ?').run(id, cid);
+    return c.json({ data: { likes: likeCount(id), liked: method === 'PUT' } });
+  });
+}
 app.get('/api/photos/:id', (c) => {
   const photo = repo.getPhoto(c.req.param('id'));
-  if (!photo || photo.status !== 'done' || repo.isSample(photo.id)) return fail(c, 404, 'not_found', '없는 사진입니다.');
-  return c.json({ data: { photo, observations: repo.photoObservations(photo.id) } });
+  if (!photo || !repo.isPublished(photo.id)) return fail(c, 404, 'not_found', '없는 사진입니다.');
+  const cid = clientId(c);
+  const liked = !!cid && !!db.prepare('SELECT 1 FROM likes WHERE photo_id = ? AND client_id = ?').get(photo.id, cid);
+  return c.json({ data: { photo, observations: repo.photoObservations(photo.id), liked } });
 });
 
 app.get('/api/stream', (c) =>
@@ -161,7 +195,6 @@ app.get('/media/crops/:file', (c) => sendJpeg(c, cropPath(Number(safeId(c.req.pa
 // ---------- 운영자 ----------
 const admin = new Hono();
 // 터널·nginx 뒤라 실제 접속지는 Cloudflare 헤더로 판단한다.
-const clientIp = (c: Context) => c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
 
 admin.use('*', async (c, next) => {
   const ip = clientIp(c);

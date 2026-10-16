@@ -81,6 +81,12 @@ const migrations: string[] = [
    );
    CREATE INDEX wholesale_slug ON wholesale(slug, day);
    CREATE TABLE wholesale_days (day TEXT PRIMARY KEY, rows INTEGER NOT NULL, fetched_at TEXT NOT NULL);`,
+  `CREATE TABLE likes (
+     photo_id TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+     client_id TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     PRIMARY KEY (photo_id, client_id)
+   );`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (id INTEGER PRIMARY KEY)');

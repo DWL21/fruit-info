@@ -116,18 +116,18 @@ export const getStore = (id: number) => listStores().find((s) => s.id === id) ??
 
 interface PhotoRow {
   id: string; store_id: number; store_name: string; width: number; height: number; status: Photo['status'];
-  read_store_name: string | null; item_count: number; review_count: number; error: string | null; duration_ms: number | null; taken_at: string; held: number;
+  read_store_name: string | null; item_count: number; review_count: number; error: string | null; duration_ms: number | null; taken_at: string; held: number; likes: number;
 }
 
 const PHOTO_SQL = `SELECT p.id, p.store_id, s.name AS store_name, p.width, p.height, p.status, p.read_store_name, p.error,
-  p.duration_ms, p.taken_at, p.held, (SELECT COUNT(*) FROM observations o WHERE o.photo_id = p.id AND o.hidden = 0) AS item_count,
+  p.duration_ms, p.taken_at, p.held, (SELECT COUNT(*) FROM likes l WHERE l.photo_id = p.id) AS likes, (SELECT COUNT(*) FROM observations o WHERE o.photo_id = p.id AND o.hidden = 0) AS item_count,
   (SELECT COUNT(*) FROM observations o WHERE o.photo_id = p.id AND o.review = 1) AS review_count
   FROM photos p JOIN stores s ON s.id = p.store_id`;
 
 const toPhoto = (r: PhotoRow): Photo => ({
   id: r.id, storeId: r.store_id, storeName: r.store_name, url: photoUrl(r.id), width: r.width, height: r.height,
   status: r.status, readStoreName: r.read_store_name, itemCount: r.item_count, reviewCount: r.review_count, error: r.error,
-  durationMs: r.duration_ms, takenAt: r.taken_at, held: !!r.held,
+  durationMs: r.duration_ms, takenAt: r.taken_at, held: !!r.held, likes: r.likes,
 });
 
 export function isSample(id: string): boolean {
@@ -174,19 +174,44 @@ export function itemHistory(itemSlug: string) {
     .all(itemSlug) as { day: string; min_price: number; stores: number }[];
 }
 
-/** 피드: 분석이 끝나 게시된 최신 사진과 그 시세 (대기·분석 중은 숨김) */
-export function feed(limit: number, before?: string) {
+/** 게시된(분석 완료·보류 아님·평가용 아님) 사진인지 */
+export function isPublished(id: string): boolean {
+  return !!db.prepare(`SELECT 1 FROM photos WHERE id = ? AND status = 'done' AND sample = 0 AND held = 0`).get(id);
+}
+
+export type FeedSort = 'latest' | 'popular';
+
+/**
+ * 피드: 분석이 끝나 게시된 사진과 그 시세 (대기·분석 중은 숨김).
+ * latest: 최신순(before 커서), popular: 최근 VISIBLE_DAYS일 안에서 좋아요순(offset).
+ */
+export function feed(limit: number, opts: { before?: string; offset?: number; sort?: FeedSort; clientId?: string } = {}) {
+  const popular = opts.sort === 'popular';
+  const where = [`p.status = 'done'`, 'p.sample = 0', 'p.held = 0', 's.active = 1'];
+  if (popular) where.push(`p.taken_at >= @since`);
+  else if (opts.before) where.push('p.taken_at < @before');
   const rows = db
     .prepare(
-      `${PHOTO_SQL} WHERE p.status = 'done' AND p.sample = 0 AND p.held = 0 AND s.active = 1 ${before ? 'AND p.taken_at < @before' : ''} ORDER BY p.taken_at DESC LIMIT @limit`,
+      `${PHOTO_SQL} WHERE ${where.join(' AND ')} ORDER BY ${popular ? 'likes DESC, p.taken_at DESC' : 'p.taken_at DESC'} LIMIT @limit OFFSET @offset`,
     )
-    .all({ limit, before }) as PhotoRow[];
+    .all({
+      limit,
+      before: opts.before,
+      offset: popular ? Math.max(0, opts.offset ?? 0) : 0,
+      since: new Date(Date.now() - VISIBLE_DAYS * 86400_000).toISOString(),
+    }) as PhotoRow[];
+  const liked = new Set(
+    opts.clientId && rows.length
+      ? (db.prepare(`SELECT photo_id FROM likes WHERE client_id = ? AND photo_id IN (${rows.map(() => '?').join(',')})`).pluck().all(opts.clientId, ...rows.map((r) => r.id)) as string[])
+      : [],
+  );
   return rows.map((r) => {
     const photo = toPhoto(r);
     const store = getStore(r.store_id);
     return {
       photo,
       store,
+      liked: liked.has(r.id),
       observations: photoObservations(photo.id),
     };
   });

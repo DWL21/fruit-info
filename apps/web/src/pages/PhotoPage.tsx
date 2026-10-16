@@ -4,6 +4,7 @@ import { api } from '../lib/api.ts';
 import { ErrorBox, Loading } from '../components/States.tsx';
 import { Link } from '../components/Link.tsx';
 import { navigate } from '../lib/router.ts';
+import { LikeButton } from '../components/LikeButton.tsx';
 
 function BoxRect({ b, stroke, fill }: { b: Box; stroke: string; fill: string }) {
   return <rect x={b.x / 10} y={b.y / 10} width={b.w / 10} height={b.h / 10} fill={fill} stroke={stroke} strokeWidth={3} vectorEffect="non-scaling-stroke" />;
@@ -39,6 +40,7 @@ export function PhotoPage({ id, focus }: { id: string; focus: number | null }) {
           
         </figcaption>
       </figure>
+      <LikeButton photoId={photo.id} likes={photo.likes} liked={q.data.liked} />
       <ul className="plate-platinum divide-y divide-hairline/40 overflow-hidden">
         {observations.map((o) => {
           const c = CATALOG.find((x) => x.slug === o.itemSlug);

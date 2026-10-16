@@ -1,10 +1,14 @@
+import { clientId } from './client.ts';
 import type { ItemSummary, Observation, Photo, Store, StoreInput, ObservationPatch, WholesaleDay, WholesaleHistory } from '@fruit/shared';
 
 export interface FeedEntry {
   photo: Photo;
   store: Store | null;
   observations: Observation[];
+  liked: boolean;
 }
+
+export type FeedSort = 'latest' | 'popular';
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8787';
 
@@ -34,13 +38,18 @@ export interface ItemDetail {
 
 export const api = {
   items: () => request<ItemSummary[]>('/api/items'),
-  feed: (before?: string) => request<FeedEntry[]>(`/api/feed?limit=12${before ? `&before=${encodeURIComponent(before)}` : ''}`),
+  feed: (sort: FeedSort, cursor?: string | number) =>
+    request<FeedEntry[]>(
+      `/api/feed?limit=12&sort=${sort}${cursor === undefined ? '' : sort === 'popular' ? `&offset=${cursor}` : `&before=${encodeURIComponent(String(cursor))}`}`,
+      { headers: { 'x-client-id': clientId() } },
+    ),
+  like: (id: string, on: boolean) => request<{ likes: number; liked: boolean }>(`/api/photos/${id}/like`, { method: on ? 'PUT' : 'DELETE', headers: { 'x-client-id': clientId() } }),
   item: (slug: string) => request<ItemDetail>(`/api/items/${slug}`),
   stores: () => request<Store[]>('/api/stores'),
   wholesale: (day?: string) => request<WholesaleDay>(`/api/wholesale${day ? `?day=${day}` : ''}`),
   wholesaleHistory: (slug: string) => request<WholesaleHistory>(`/api/wholesale/${slug}`),
   store: (id: number) => request<{ store: Store; observations: Observation[]; photos: Photo[] }>(`/api/stores/${id}`),
-  photo: (id: string) => request<{ photo: Photo; observations: Observation[] }>(`/api/photos/${id}`),
+  photo: (id: string) => request<{ photo: Photo; observations: Observation[]; liked: boolean }>(`/api/photos/${id}`, { headers: { 'x-client-id': clientId() } }),
 };
 
 const KEY_STORAGE = 'fruit.uploadKey';
