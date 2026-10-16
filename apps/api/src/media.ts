@@ -8,6 +8,7 @@ export { cropBox } from './geometry.ts';
 export const dirs = {
   originals: join(config.dataDir, 'originals'),
   photos: join(config.dataDir, 'photos'),
+  previews: join(config.dataDir, 'previews'),
   crops: join(config.dataDir, 'crops'),
 };
 Object.values(dirs).forEach((d) => mkdirSync(d, { recursive: true }));
@@ -17,6 +18,13 @@ export const photoPath = (id: string) => join(dirs.photos, `${id}.jpg`);
 export const cropPath = (obsId: number) => join(dirs.crops, `${obsId}.jpg`);
 
 export const photoUrl = (id: string) => `${config.publicUrl}/media/photos/${id}.jpg`;
+export const previewPath = (id: string) => join(dirs.previews, `${id}.jpg`);
+export const previewUrl = (id: string) => `${config.publicUrl}/media/previews/${id}.jpg`;
+
+/** 분석(얼굴 흐림) 전에 피드에 바로 보여줄, 얼굴을 알아볼 수 없게 흐린 작은 미리보기 */
+export async function makePreview(id: string) {
+  await sharp(originalPath(id)).resize({ width: 320, height: 320, fit: 'inside' }).blur(10).jpeg({ quality: 60 }).toFile(previewPath(id));
+}
 export const cropUrl = (obsId: number) => `${config.publicUrl}/media/crops/${obsId}.jpg`;
 
 /** 업로드 원본을 회전 보정·리사이즈하고 메타데이터(GPS 등)를 지워 비공개 원본으로 저장한다. */

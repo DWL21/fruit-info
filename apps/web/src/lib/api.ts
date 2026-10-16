@@ -1,5 +1,11 @@
 import type { ItemSummary, Observation, Photo, Store, StoreInput, ObservationPatch } from '@fruit/shared';
 
+export interface FeedEntry {
+  photo: Photo;
+  store: Store | null;
+  observations: Observation[];
+}
+
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8787';
 
 export class ApiError extends Error {
@@ -28,6 +34,7 @@ export interface ItemDetail {
 
 export const api = {
   items: () => request<ItemSummary[]>('/api/items'),
+  feed: (before?: string) => request<FeedEntry[]>(`/api/feed?limit=12${before ? `&before=${encodeURIComponent(before)}` : ''}`),
   item: (slug: string) => request<ItemDetail>(`/api/items/${slug}`),
   stores: () => request<Store[]>('/api/stores'),
   store: (id: number) => request<{ store: Store; observations: Observation[]; photos: Photo[] }>(`/api/stores/${id}`),

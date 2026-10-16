@@ -137,7 +137,9 @@ export type ObservationPatch = z.infer<typeof ObservationPatch>;
 /** SSE 이벤트 */
 export type LiveEvent =
   | { type: 'photo'; photo: Photo }
-  | { type: 'prices'; storeId: number; itemSlugs: string[] };
+  | { type: 'prices'; storeId: number; itemSlugs: string[] }
+  /** 공개 피드: 새 사진이 올라왔거나 분석이 끝났다 */
+  | { type: 'feed'; photoId: string };
 
 /** 이 시간 안에 찍은 시세만 기본 목록에 보인다 */
 export const VISIBLE_DAYS = 7;

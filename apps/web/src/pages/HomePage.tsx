@@ -1,12 +1,20 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { CATALOG, timeAgo, won } from '@fruit/shared';
 import { api } from '../lib/api.ts';
 import { Link } from '../components/Link.tsx';
-import { Empty, ErrorBox, Loading } from '../components/States.tsx';
+import { Empty, ErrorBox, Loading, SectionTitle } from '../components/States.tsx';
+import { FeedCard } from '../components/FeedCard.tsx';
 
 export function HomePage() {
   const items = useQuery({ queryKey: ['items'], queryFn: api.items });
+  const feed = useInfiniteQuery({
+    queryKey: ['feed'],
+    queryFn: ({ pageParam }) => api.feed(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => (last.length === 12 ? last.at(-1)!.photo.takenAt : undefined),
+  });
+  const entries = feed.data?.pages.flat() ?? [];
   const [q, setQ] = useState('');
   const filtered = useMemo(() => {
     const term = q.replace(/\s/g, '');
@@ -17,11 +25,45 @@ export function HomePage() {
 
   return (
     <div>
-      <section className="plate relative overflow-hidden bg-lavender p-4">
-        <h1 className="display-outline text-[28px] leading-[1.15]">오늘의 과일 시세</h1>
-        <span className="pointer-events-none absolute -right-3 -bottom-4 text-[88px] opacity-90" aria-hidden>🍊</span>
+      <h1 className="sr-only">오늘의 과일 시세</h1>
+      {/* 과일별 최저가: 스토리처럼 가로로 넘긴다 */}
+      {!!items.data?.length && (
+        <ul className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2" aria-label="과일별 최저가">
+          {items.data.map((i) => (
+            <li key={i.slug} className="shrink-0">
+              <Link href={`/item/${i.slug}`} className="flex w-16 flex-col items-center gap-1">
+                <span className="size-16 overflow-hidden rounded-full border-[3px] border-signal bg-white p-0.5 shadow-[0_2px_0_var(--color-chrome)]">
+                  {i.cropUrl ? <img src={i.cropUrl} alt="" className="size-full rounded-full object-cover" /> : <span className="flex size-full items-center justify-center text-2xl">{i.emoji}</span>}
+                </span>
+                <span className="w-full truncate text-center text-[11px] font-bold leading-tight">{i.emoji} {i.name}</span>
+                <span className="num w-full truncate text-center text-[11px] font-black leading-none">{won(i.minPrice)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <section className="mt-3 space-y-5" aria-label="최신 매대 사진">
+        {feed.isPending ? (
+          <Loading />
+        ) : feed.isError ? (
+          <ErrorBox error={feed.error} retry={() => feed.refetch()} />
+        ) : entries.length ? (
+          entries.map((e) => <FeedCard key={e.photo.id} entry={e} />)
+        ) : (
+          <Empty title="사진 없음" />
+        )}
+        {feed.hasNextPage && (
+          <button onClick={() => void feed.fetchNextPage()} disabled={feed.isFetchingNextPage} className="btn-carbon min-h-11 w-full">
+            {feed.isFetchingNextPage ? '불러오는 중' : '더 보기'}
+          </button>
+        )}
       </section>
-      <label className="mt-4 block">
+
+      <div className="mt-8">
+        <SectionTitle>과일별 최저가</SectionTitle>
+      </div>
+      <label className="mt-2 block">
         <span className="sr-only">과일 검색</span>
         <input
           type="search"
