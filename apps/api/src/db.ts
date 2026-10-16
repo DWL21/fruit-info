@@ -63,6 +63,7 @@ const migrations: string[] = [
    CREATE UNIQUE INDEX stores_kakao ON stores(kakao_id) WHERE kakao_id IS NOT NULL;`,
   `ALTER TABLE photos ADD COLUMN auto_store INTEGER NOT NULL DEFAULT 0;`,
   `ALTER TABLE observations ADD COLUMN review INTEGER NOT NULL DEFAULT 0;`,
+  `ALTER TABLE stores ADD COLUMN stall_no TEXT;`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (id INTEGER PRIMARY KEY)');

@@ -148,8 +148,8 @@ admin.post('/verify', (c) => c.json({ data: { ok: true } }));
 admin.post('/stores', async (c) => {
   const parsed = StoreInput.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return fail(c, 400, 'invalid', parsed.error.issues[0]?.message ?? '입력을 확인하세요.');
-  const { name, aisle, position, side, address, note } = parsed.data;
-  const row = db.prepare('INSERT INTO stores (name, aisle, position, side, address, note) VALUES (?, ?, ?, ?, ?, ?) RETURNING id').get(name, aisle, position, side, address ?? null, note ?? null) as { id: number };
+  const { name, aisle, position, side, address, stallNo, note } = parsed.data;
+  const row = db.prepare('INSERT INTO stores (name, aisle, position, side, address, stall_no, note) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id').get(name, aisle, position, side, address ?? null, stallNo || null, note ?? null) as { id: number };
   return c.json({ data: repo.getStore(row.id) }, 201);
 });
 
@@ -157,10 +157,11 @@ admin.patch('/stores/:id', async (c) => {
   const id = Number(c.req.param('id'));
   const parsed = StoreInput.partial().safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return fail(c, 400, 'invalid', parsed.error.issues[0]?.message ?? '입력을 확인하세요.');
-  const cur = db.prepare('SELECT * FROM stores WHERE id = ?').get(id) as { name: string; aisle: string; position: number; side: string; address: string | null; note: string | null } | undefined;
+  const cur = db.prepare('SELECT * FROM stores WHERE id = ?').get(id) as { name: string; aisle: string; position: number; side: string; address: string | null; stall_no: string | null; note: string | null } | undefined;
   if (!cur) return fail(c, 404, 'not_found', '없는 가게입니다.');
   const v = { ...cur, ...Object.fromEntries(Object.entries(parsed.data).filter(([, x]) => x !== undefined)) };
-  db.prepare('UPDATE stores SET name = ?, aisle = ?, position = ?, side = ?, address = ?, note = ? WHERE id = ?').run(v.name, v.aisle, v.position, v.side, v.address ?? null, v.note ?? null, id);
+  const stallNo = parsed.data.stallNo !== undefined ? parsed.data.stallNo || null : cur.stall_no;
+  db.prepare('UPDATE stores SET name = ?, aisle = ?, position = ?, side = ?, address = ?, stall_no = ?, note = ? WHERE id = ?').run(v.name, v.aisle, v.position, v.side, v.address ?? null, stallNo, v.note ?? null, id);
   return c.json({ data: repo.getStore(id) });
 });
 

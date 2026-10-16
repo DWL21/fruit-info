@@ -91,21 +91,21 @@ export function itemSummaries(): ItemSummary[] {
   return out.sort((a, b) => b.storeCount - a.storeCount || b.lastObservedAt.localeCompare(a.lastObservedAt));
 }
 
-interface StoreRow { id: number; name: string; aisle: Aisle; position: number; side: 'A' | 'B'; address: string | null; note: string | null; last_photo_at: string | null }
+interface StoreRow { id: number; name: string; aisle: Aisle; position: number; side: 'A' | 'B'; address: string | null; stall_no: string | null; note: string | null; last_photo_at: string | null }
 
 export function listStores(): Store[] {
   const counts = new Map<number, number>();
   for (const o of currentObservations()) counts.set(o.storeId, (counts.get(o.storeId) ?? 0) + 1);
   const rows = db
     .prepare(
-      `SELECT s.id, s.name, s.aisle, s.position, s.side, s.address, s.note,
+      `SELECT s.id, s.name, s.aisle, s.position, s.side, s.address, s.stall_no, s.note,
               (SELECT MAX(taken_at) FROM photos p WHERE p.store_id = s.id AND p.status = 'done') AS last_photo_at
        FROM stores s WHERE s.active = 1`,
     )
     .all() as StoreRow[];
   return rows
     .map((r) => ({
-      id: r.id, name: r.name, aisle: r.aisle, position: r.position, side: r.side, address: r.address, note: r.note,
+      id: r.id, name: r.name, aisle: r.aisle, position: r.position, side: r.side, address: r.address, stallNo: r.stall_no, note: r.note,
       itemCount: counts.get(r.id) ?? 0, lastPhotoAt: r.last_photo_at,
     }))
     .sort((a, b) => walkKey(a) - walkKey(b));
