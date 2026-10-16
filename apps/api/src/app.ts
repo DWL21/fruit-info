@@ -15,6 +15,7 @@ import * as repo from './repo.ts';
 import { capture } from './monitor.ts';
 import { isLocked, recordFail, recordSuccess } from './lockout.ts';
 import { deleteObservations, deletePhotos } from './remove.ts';
+import { wholesaleDay, wholesaleHistory } from './wholesale.ts';
 
 const fail = (c: Context, status: 400 | 401 | 404 | 413 | 415 | 429 | 503, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
@@ -90,6 +91,16 @@ app.get('/api/stores/:id', (c) => {
   });
 });
 // 홈 피드: 최신 매대 사진. 분석 전 사진은 흐린 미리보기로 바로 보인다.
+app.get('/api/wholesale', (c) => {
+  const day = c.req.query('day');
+  return c.json({ data: wholesaleDay(day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : undefined) });
+});
+app.get('/api/wholesale/:slug', (c) => {
+  const slug = c.req.param('slug');
+  if (!CATALOG.some((i) => i.slug === slug)) return fail(c, 404, 'not_found', '없는 과일입니다.');
+  return c.json({ data: wholesaleHistory(slug) });
+});
+
 app.get('/api/feed', (c) => {
   const limit = Math.min(30, Math.max(1, Number(c.req.query('limit') ?? 12)));
   const before = c.req.query('before');

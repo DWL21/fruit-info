@@ -12,4 +12,7 @@ export const config = {
   codexBin: env.CODEX_BIN ?? 'codex',
   codexModel: env.CODEX_MODEL ?? 'gpt-6.1-sol',
   concurrency: Math.max(1, Number(env.ANALYZE_CONCURRENCY ?? 2)),
+  /** KAMIS Open API 인증 (없으면 KAMIS 문서의 시험용 값) */
+  kamisKey: env.KAMIS_CERT_KEY || '111',
+  kamisId: env.KAMIS_CERT_ID || '222',
 };
