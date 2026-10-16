@@ -14,6 +14,7 @@ import { kickQueue } from './queue.ts';
 import * as repo from './repo.ts';
 import { capture } from './monitor.ts';
 import { isLocked, recordFail, recordSuccess } from './lockout.ts';
+import { deleteObservations, deletePhotos } from './remove.ts';
 
 const fail = (c: Context, status: 400 | 401 | 404 | 413 | 415 | 429 | 503, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
@@ -240,6 +241,21 @@ admin.post('/photos/:id/reanalyze', (c) => {
   if (!r.changes) return fail(c, 404, 'not_found', '다시 분석할 수 없는 사진입니다.');
   kickQueue();
   return c.json({ data: repo.getPhoto(c.req.param('id')) });
+});
+
+// 사진 삭제: 하나·선택·전체 모두 ids 목록으로 받는다.
+admin.post('/photos/delete', async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { ids?: unknown } | null;
+  const ids = Array.isArray(body?.ids) ? body.ids.filter((x): x is string => typeof x === 'string').slice(0, 1000) : [];
+  if (!ids.length) return fail(c, 400, 'invalid', '지울 사진을 선택하세요.');
+  return c.json({ data: deletePhotos(ids) });
+});
+
+admin.post('/observations/delete', async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { ids?: unknown } | null;
+  const ids = Array.isArray(body?.ids) ? body.ids.map(Number).filter((x) => Number.isInteger(x) && x > 0).slice(0, 1000) : [];
+  if (!ids.length) return fail(c, 400, 'invalid', '지울 시세를 선택하세요.');
+  return c.json({ data: { deleted: deleteObservations(ids) } });
 });
 
 admin.patch('/observations/:id', async (c) => {

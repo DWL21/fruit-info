@@ -499,6 +499,29 @@ const statusLabel: Record<Photo['status'], string> = { queued: '대기', analyzi
 
 function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClose }: { initialOpen: string | null; stores: Store[]; photos: Photo[]; jobs: Job[]; retry: (id: string) => void; discard: (id: string) => void; onClose: () => void }) {
   const [open, setOpen] = useState<string | null>(initialOpen);
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const qc = useQueryClient();
+  const remove = useMutation({
+    mutationFn: (ids: string[]) => adminApi.deletePhotos(ids),
+    onSuccess: (r) => {
+      setPicked(new Set());
+      setSelecting(false);
+      if (r.skipped.length) window.alert(`분석 중인 사진 ${r.skipped.length}장은 지우지 못했습니다. 분석이 끝난 뒤 다시 지우세요.`);
+      void qc.invalidateQueries();
+    },
+    onError: (e: ApiError) => window.alert(e.message),
+  });
+  const ask = (ids: string[]) => {
+    if (ids.length && window.confirm(`사진 ${ids.length}장과 그 시세를 지울까요? 되돌릴 수 없습니다.`)) remove.mutate(ids);
+  };
+  const toggle = (id: string) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   const failedJobs = jobs.filter((j) => j.state === 'error');
   return (
     <Sheet title="분석 결과" onClose={onClose}>
@@ -515,10 +538,47 @@ function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClo
           ))}
         </div>
       )}
+      {photos.length > 0 && (
+        <div className="mb-2 flex items-center gap-2">
+          {selecting ? (
+            <>
+              <button
+                onClick={() => setPicked(picked.size === photos.length ? new Set() : new Set(photos.map((p) => p.id)))}
+                className="min-h-10 rounded-lg bg-platinum px-3 text-xs font-semibold"
+              >
+                {picked.size === photos.length ? '선택 해제' : '모두 선택'}
+              </button>
+              <span className="flex-1 text-xs text-chrome">{picked.size}장 선택</span>
+              <button onClick={() => ask([...picked])} disabled={!picked.size || remove.isPending} className="min-h-10 rounded-lg bg-red-600 px-3 text-xs font-bold text-white disabled:opacity-40">
+                선택 삭제
+              </button>
+              <button onClick={() => { setSelecting(false); setPicked(new Set()); }} className="min-h-10 rounded-lg px-2 text-xs">취소</button>
+            </>
+          ) : (
+            <>
+              <span className="flex-1" />
+              <button onClick={() => setSelecting(true)} className="min-h-10 rounded-lg bg-platinum px-3 text-xs font-semibold">선택</button>
+              <button onClick={() => ask(photos.map((p) => p.id))} disabled={remove.isPending} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-red-600 ring-1 ring-red-200">
+                전체 삭제
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <ul className="space-y-2">
         {photos.map((p) => (
-          <li key={p.id} className="rounded-xl bg-white ring-1 ring-chrome">
-            <button onClick={() => setOpen(open === p.id ? null : p.id)} className="flex min-h-14 w-full items-center gap-3 p-2 text-left" aria-expanded={open === p.id}>
+          <li key={p.id} className={`rounded-xl bg-white ring-1 ${picked.has(p.id) ? 'ring-2 ring-red-500' : 'ring-chrome'}`}>
+            <button
+              onClick={() => (selecting ? toggle(p.id) : setOpen(open === p.id ? null : p.id))}
+              className="flex min-h-14 w-full items-center gap-3 p-2 text-left"
+              aria-expanded={selecting ? undefined : open === p.id}
+              aria-pressed={selecting ? picked.has(p.id) : undefined}
+            >
+              {selecting && (
+                <span aria-hidden className={`flex size-6 shrink-0 items-center justify-center rounded-md border-2 text-xs font-black ${picked.has(p.id) ? 'border-red-600 bg-red-600 text-white' : 'border-chrome bg-white'}`}>
+                  {picked.has(p.id) ? '✓' : ''}
+                </span>
+              )}
               {p.status === 'done' ? <img src={p.url} alt="" className="size-12 rounded-lg object-cover" /> : <span className="size-12 rounded-lg bg-platinum" />}
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{p.storeName}</span>
@@ -534,7 +594,7 @@ function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClo
                 {p.error && <span className="block truncate text-xs text-red-600">{p.error}</span>}
               </span>
             </button>
-            {open === p.id && <PhotoReview id={p.id} stores={stores} storeId={p.storeId} />}
+            {open === p.id && !selecting && <PhotoReview id={p.id} stores={stores} storeId={p.storeId} onDelete={() => ask([p.id])} />}
           </li>
         ))}
       </ul>
@@ -542,7 +602,7 @@ function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClo
   );
 }
 
-function PhotoReview({ id, stores, storeId }: { id: string; stores: Store[]; storeId: number }) {
+function PhotoReview({ id, stores, storeId, onDelete }: { id: string; stores: Store[]; storeId: number; onDelete: () => void }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['admin-photo', id], queryFn: () => adminApi.photo(id) });
   const patch = useMutation({
@@ -550,6 +610,7 @@ function PhotoReview({ id, stores, storeId }: { id: string; stores: Store[]; sto
     onSuccess: () => void qc.invalidateQueries(),
   });
   const reanalyze = useMutation({ mutationFn: () => adminApi.reanalyze(id), onSuccess: () => void qc.invalidateQueries() });
+  const removeObs = useMutation({ mutationFn: (obsId: number) => adminApi.deleteObservations([obsId]), onSuccess: () => void qc.invalidateQueries() });
   const move = useMutation({ mutationFn: (sid: number) => adminApi.moveStore(id, sid), onSuccess: () => void qc.invalidateQueries() });
   if (!q.data) return <p className="p-3 text-sm text-chrome">불러오는 중…</p>;
   return (
@@ -589,13 +650,25 @@ function PhotoReview({ id, stores, storeId }: { id: string; stores: Store[]; sto
             {o.review && (
               <button onClick={() => patch.mutate({ obsId: o.id, hidden: false, review: false })} className="btn-signal min-h-10 px-3 text-xs">게시</button>
             )}
-            <button onClick={() => patch.mutate({ obsId: o.id, hidden: true, review: false })} className="min-h-10 rounded-lg px-2 text-xs text-red-600 ring-1 ring-red-200">숨기기</button>
+            <button onClick={() => patch.mutate({ obsId: o.id, hidden: true, review: false })} className="min-h-10 rounded-lg px-2 text-xs ring-1 ring-chrome">숨기기</button>
+            <button
+              onClick={() => window.confirm('이 시세를 지울까요?') && removeObs.mutate(o.id)}
+              disabled={removeObs.isPending}
+              className="min-h-10 rounded-lg px-2 text-xs text-red-600 ring-1 ring-red-200"
+            >
+              삭제
+            </button>
           </li>
         ))}
       </ul>
-      <button onClick={() => reanalyze.mutate()} disabled={reanalyze.isPending} className="mt-3 min-h-11 w-full rounded-lg bg-platinum text-sm font-semibold">
-        다시 분석
-      </button>
+      <div className="mt-3 flex gap-2">
+        <button onClick={() => reanalyze.mutate()} disabled={reanalyze.isPending} className="min-h-11 flex-1 rounded-lg bg-platinum text-sm font-semibold">
+          다시 분석
+        </button>
+        <button onClick={onDelete} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-red-600 ring-1 ring-red-200">
+          사진 삭제
+        </button>
+      </div>
     </div>
   );
 }
