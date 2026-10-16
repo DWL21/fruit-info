@@ -64,11 +64,12 @@ export const adminApi = {
   verify: (key: string) => request<{ ok: true }>('/api/admin/verify', { method: 'POST', headers: { 'x-upload-key': key } }),
   photos: () => request<Photo[]>('/api/admin/photos', adminInit()),
   photo: (id: string) => request<{ photo: Photo; observations: Observation[] }>(`/api/admin/photos/${id}`, adminInit()),
-  upload: (photo: Blob, storeId: number, takenAt: string) => {
+  upload: (photo: Blob, storeId: number, takenAt: string, autoStore = false) => {
     const form = new FormData();
     form.set('photo', new File([photo], 'photo.jpg', { type: 'image/jpeg' }));
     form.set('storeId', String(storeId));
     form.set('takenAt', takenAt);
+    if (autoStore) form.set('autoStore', '1');
     return request<Photo>('/api/admin/photos', adminInit({ method: 'POST', body: form }));
   },
   reanalyze: (id: string) => request<Photo>(`/api/admin/photos/${id}/reanalyze`, adminInit({ method: 'POST' })),
