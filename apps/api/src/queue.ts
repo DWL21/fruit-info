@@ -3,10 +3,10 @@ import { analyze } from './analyzer.ts';
 import { db } from './db.ts';
 import { live } from './live.ts';
 import { cropBox, makeCrop, originalPath, publishPhoto } from './media.ts';
-import { getPhoto } from './repo.ts';
+import { currentObservations, getPhoto } from './repo.ts';
 import { config } from './config.ts';
 import { capture } from './monitor.ts';
-import { needsReview } from './publish.ts';
+import { isOutlier, needsReview } from './publish.ts';
 
 let running = 0;
 
@@ -63,12 +63,16 @@ async function processOne(): Promise<boolean> {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     );
     const created: { id: number; slug: string; box: ReturnType<typeof cropBox> }[] = [];
+    // 같은 과일의 현재 공개 시세 (이상치 판단용)
+    const currentPrices = new Map<string, { storeId: number; price: number }[]>();
+    for (const o of currentObservations()) currentPrices.set(o.itemSlug, [...(currentPrices.get(o.itemSlug) ?? []), { storeId: o.storeId, price: o.price }]);
     db.transaction(() => {
       db.prepare('DELETE FROM observations WHERE photo_id = ?').run(next.id);
       for (const it of analysis.items) {
         const item = matchCatalog(it.name, it.variety);
         if (!item || it.price === null || it.price < 100) continue;
-        const hold = needsReview(it) ? 1 : 0;
+        const others = (currentPrices.get(item.slug) ?? []).filter((x) => x.storeId !== next.store_id).map((x) => x.price);
+        const hold = needsReview(it) || isOutlier(it.price, others) ? 1 : 0;
         const row = insert.get(
           next.id, next.store_id, item.slug, it.name, it.variety, it.price, it.unit, it.confidence,
           it.price_box ? JSON.stringify(it.price_box) : null, it.product_box ? JSON.stringify(it.product_box) : null,
