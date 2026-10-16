@@ -30,6 +30,31 @@ interface Job {
 }
 
 const IDX_KEY = 'fruit.shootIndex';
+const AUTO_NEXT_KEY = 'fruit.shootAutoNext';
+const SIGN_KEY = 'fruit.shootSign';
+const readFlag = (k: string, d: boolean) => {
+  try {
+    const v = localStorage.getItem(k);
+    return v === null ? d : v === '1';
+  } catch {
+    return d;
+  }
+};
+const writeFlag = (k: string, v: boolean) => {
+  try {
+    localStorage.setItem(k, v ? '1' : '0');
+  } catch {
+    /* 저장 불가 */
+  }
+};
+
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button type="button" onClick={() => onChange(!on)} aria-pressed={on} className={`min-h-10 flex-1 rounded-lg border px-2 font-bold ${on ? 'border-amber bg-amber text-carbon' : 'border-white/30 text-white/70'}`}>
+      {label} {on ? '켬' : '끔'}
+    </button>
+  );
+}
 const readIdx = () => {
   try {
     return Number(localStorage.getItem(IDX_KEY) ?? 0) || 0;
@@ -86,7 +111,14 @@ function Shooter() {
   const stores = useQuery({ queryKey: ['stores'], queryFn: api.stores });
   const list = useMemo(() => stores.data ?? [], [stores.data]);
   const [idx, setIdx] = useState(readIdx);
-  const [auto, setAuto] = useState(true);
+  const [auto, setAuto] = useState(() => readFlag(AUTO_NEXT_KEY, true));
+  const [sign, setSign] = useState(() => readFlag(SIGN_KEY, true));
+  useEffect(() => {
+    writeFlag(AUTO_NEXT_KEY, auto);
+  }, [auto]);
+  useEffect(() => {
+    writeFlag(SIGN_KEY, sign);
+  }, [sign]);
   const [panel, setPanel] = useState<'none' | 'stores' | 'results'>('none');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [flash, setFlash] = useState(false);
@@ -124,7 +156,7 @@ function Shooter() {
   const enqueue = useCallback(
     (blob: Blob, takenAt: string, autoStore = false) => {
       if (!current) return;
-      const item = { id: crypto.randomUUID(), storeId: current.id, storeName: autoStore ? '간판 자동' : current.name, blob, takenAt, autoStore };
+      const item = { id: crypto.randomUUID(), storeId: current.id, storeName: autoStore ? `${current.name} · 간판 확인` : current.name, blob, takenAt, autoStore };
       void outbox.put(item);
       setJobs((js) => [{ ...item, preview: URL.createObjectURL(blob), state: 'waiting' }, ...js]);
     },
@@ -163,7 +195,7 @@ function Shooter() {
     setFlash(true);
     setTimeout(() => setFlash(false), 120);
     navigator.vibrate?.(30);
-    enqueue(await toJpeg(v, v.videoWidth, v.videoHeight), new Date().toISOString());
+    enqueue(await toJpeg(v, v.videoWidth, v.videoHeight), new Date().toISOString(), sign);
     track('shoot_capture', { store_id: current.id, source: 'camera' });
     if (auto) go(idx + 1);
   };
@@ -257,10 +289,10 @@ function Shooter() {
             업로드 대기 {pending} · 분석 중 {analyzing}
             {failed > 0 && <span className="text-red-300"> · 실패 {failed}</span>}
           </span>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} className="size-5 accent-green-500" />
-            찍으면 다음 가게로
-          </label>
+        </div>
+        <div className="flex gap-2 text-xs">
+          <Toggle on={sign} onChange={setSign} label="간판 인식" />
+          <Toggle on={auto} onChange={setAuto} label="찍으면 다음 가게" />
         </div>
         <div className="flex items-center justify-between">
           <label className="flex min-h-12 w-20 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-sm">
@@ -281,7 +313,7 @@ function Shooter() {
       </div>
 
       {panel === 'stores' && <StoresPanel stores={list} currentId={current?.id} onPick={(i) => (go(i), setPanel('none'))} onClose={() => setPanel('none')} />}
-      {panel === 'results' && <ResultsPanel photos={photos.data ?? []} jobs={jobs} retry={(id) => setJobs((js) => js.map((j) => (j.id === id ? { ...j, state: 'waiting' } : j)))} discard={(id) => (void outbox.remove(id), setJobs((js) => js.filter((j) => j.id !== id)))} onClose={() => setPanel('none')} />}
+      {panel === 'results' && <ResultsPanel stores={list} photos={photos.data ?? []} jobs={jobs} retry={(id) => setJobs((js) => js.map((j) => (j.id === id ? { ...j, state: 'waiting' } : j)))} discard={(id) => (void outbox.remove(id), setJobs((js) => js.filter((j) => j.id !== id)))} onClose={() => setPanel('none')} />}
     </div>
   );
 }
@@ -300,6 +332,13 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 
 function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; currentId?: number; onPick: (index: number) => void; onClose: () => void }) {
   const qc = useQueryClient();
+  const [q, setQ] = useState('');
+  const term = q.replace(/\s/g, '');
+  const shown = stores.map((s, i) => ({ s, i })).filter(({ s }) => !term || `${s.name}${s.address ?? ''}`.replace(/\s/g, '').includes(term));
+  const currentRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    currentRef.current?.scrollIntoView({ block: 'center' });
+  }, []);
   const [editing, setEditing] = useState<Store | null>(null);
   const [form, setForm] = useState({ name: '', aisle: 'main' as Aisle, position: 0, side: 'A' as Side });
   useEffect(() => {
@@ -320,11 +359,18 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
 
   return (
     <Sheet title="가게 선택·관리" onClose={onClose}>
+      <label className="sticky -top-4 z-10 -mx-4 mb-3 block bg-canvas px-4 py-2">
+        <span className="sr-only">가게 검색</span>
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="가게 이름·주소" className="field min-h-11 w-full px-3" />
+      </label>
       <ul className="space-y-2">
-        {stores.map((s, i) => (
-          <li key={s.id} className={`flex items-center gap-2 rounded-xl bg-white p-2 ring-1 ${s.id === currentId ? 'ring-2 ring-signal' : 'ring-chrome'}`}>
+        {shown.map(({ s, i }) => (
+          <li key={s.id} ref={s.id === currentId ? currentRef : undefined} className={`flex items-center gap-2 rounded-xl bg-white p-2 ring-1 ${s.id === currentId ? 'ring-2 ring-signal' : 'ring-chrome'}`}>
             <button onClick={() => onPick(i)} className="min-h-11 flex-1 text-left">
-              <span className="block font-semibold">{s.name}</span>
+              <span className="block font-semibold">
+                <span className="mr-1 text-xs text-chrome num">{i + 1}</span>
+                {s.name}
+              </span>
               <span className="text-xs text-chrome">
                 {placeName(s)} · {s.lastPhotoAt ? `${timeAgo(s.lastPhotoAt)} 촬영` : '촬영 기록 없음'}
               </span>
@@ -386,7 +432,7 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
 
 const statusLabel: Record<Photo['status'], string> = { queued: '대기', analyzing: '분석 중', done: '게시됨', failed: '실패' };
 
-function ResultsPanel({ photos, jobs, retry, discard, onClose }: { photos: Photo[]; jobs: Job[]; retry: (id: string) => void; discard: (id: string) => void; onClose: () => void }) {
+function ResultsPanel({ stores, photos, jobs, retry, discard, onClose }: { stores: Store[]; photos: Photo[]; jobs: Job[]; retry: (id: string) => void; discard: (id: string) => void; onClose: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const failedJobs = jobs.filter((j) => j.state === 'error');
   return (
@@ -423,7 +469,7 @@ function ResultsPanel({ photos, jobs, retry, discard, onClose }: { photos: Photo
                 {p.error && <span className="block truncate text-xs text-red-600">{p.error}</span>}
               </span>
             </button>
-            {open === p.id && <PhotoReview id={p.id} />}
+            {open === p.id && <PhotoReview id={p.id} stores={stores} storeId={p.storeId} />}
           </li>
         ))}
       </ul>
@@ -431,7 +477,7 @@ function ResultsPanel({ photos, jobs, retry, discard, onClose }: { photos: Photo
   );
 }
 
-function PhotoReview({ id }: { id: string }) {
+function PhotoReview({ id, stores, storeId }: { id: string; stores: Store[]; storeId: number }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['admin-photo', id], queryFn: () => adminApi.photo(id) });
   const patch = useMutation({
@@ -439,9 +485,20 @@ function PhotoReview({ id }: { id: string }) {
     onSuccess: () => void qc.invalidateQueries(),
   });
   const reanalyze = useMutation({ mutationFn: () => adminApi.reanalyze(id), onSuccess: () => void qc.invalidateQueries() });
+  const move = useMutation({ mutationFn: (sid: number) => adminApi.moveStore(id, sid), onSuccess: () => void qc.invalidateQueries() });
   if (!q.data) return <p className="p-3 text-sm text-chrome">불러오는 중…</p>;
   return (
     <div className="border-t border-platinum p-3">
+      <label className="mb-3 block text-xs font-bold">
+        가게
+        <select value={storeId} onChange={(e) => move.mutate(Number(e.target.value))} className="field mt-1 block min-h-11 w-full px-2 text-sm">
+          {stores.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} · {s.address ?? placeName(s)}
+            </option>
+          ))}
+        </select>
+      </label>
       <ul className="space-y-2">
         {q.data.observations.map((o) => (
           <li key={o.id} className={`flex flex-wrap items-center gap-2 ${o.review ? 'rounded-lg bg-amber/30 p-1.5' : ''}`}>
