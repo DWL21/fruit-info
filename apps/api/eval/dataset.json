@@ -98,6 +98,36 @@
         "storeName": null,
         "prices": []
       }
+    },
+    {
+      "id": "kakao-wonyong-peach-22000",
+      "store": "원용청과",
+      "url": "https://postfiles.pstatic.net/MjAyNjA4MjNfODMg/MDAxNzg3NDgxNzYxOTMz.gSv7kUDeokPohZu7UQISE94IGrA4TIsdI7DiYUOkysEg.DN2rwgHBmItBFcfdU_oo1eLQF9wEjm8pkP6VR_AcEHcg.JPEG/IMG%EF%BC%BF4084.JPG?type=w966",
+      "source": "카카오맵 장소 사진 (원용청과, 2026-08, 꿀복숭아 박스)",
+      "expect": {
+        "storeName": null,
+        "prices": [
+          {
+            "item": "peach",
+            "price": 22000
+          }
+        ]
+      }
+    },
+    {
+      "id": "kakao-wonyong-peach-10000",
+      "store": "원용청과",
+      "url": "https://postfiles.pstatic.net/MjAyNjA4MjNfNDMg/MDAxNzg3NDgxNjgxMTEw.-6zceny0edeLWpgdQxIr3OTo9AHQ8cYV7jbOKHvnozQg.2wWLFKc0JTVtgV5A8WnqDspbkrSuXa45A-aH7t8o4EMg.JPEG/output%EF%BC%BF1354437541.jpg?type=w466",
+      "source": "카카오맵 장소 사진 (원용청과, 2026-08, 꿀복숭아 박스 더미)",
+      "expect": {
+        "storeName": null,
+        "prices": [
+          {
+            "item": "peach",
+            "price": 10000
+          }
+        ]
+      }
     }
   ]
 }

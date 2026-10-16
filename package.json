@@ -9,6 +9,7 @@
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "eval": "pnpm --filter @fruit/api eval"
+    "eval": "pnpm --filter @fruit/api eval",
+    "ga4": "node scripts/ga4-report.mjs"
   }
 }
