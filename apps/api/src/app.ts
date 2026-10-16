@@ -10,7 +10,7 @@ import { config } from './config.ts';
 import { db, now } from './db.ts';
 import { live } from './live.ts';
 import { cropPath, makePreview, photoPath, previewPath, saveOriginal } from './media.ts';
-import { kickQueue } from './queue.ts';
+import { kickQueue, queuePausedUntil } from './queue.ts';
 import * as repo from './repo.ts';
 import { capture } from './monitor.ts';
 import { isLocked, recordFail, recordSuccess } from './lockout.ts';
@@ -39,7 +39,7 @@ app.onError((err, c) => {
 
 app.get('/api/health', (c) => {
   const queue = db.prepare(`SELECT status, COUNT(*) AS n FROM photos GROUP BY status`).all() as { status: string; n: number }[];
-  return c.json({ data: { ok: true, analyzer: config.analyzer, queue: Object.fromEntries(queue.map((q) => [q.status, q.n])), listeners: live.size } });
+  return c.json({ data: { ok: true, analyzer: config.analyzer, queue: Object.fromEntries(queue.map((q) => [q.status, q.n])), pausedUntil: queuePausedUntil(), listeners: live.size } });
 });
 
 // ---------- 공개 조회 ----------
