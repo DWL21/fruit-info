@@ -6,6 +6,7 @@ import { cropBox, makeCrop, originalPath, publishPhoto } from './media.ts';
 import { getPhoto } from './repo.ts';
 import { config } from './config.ts';
 import { capture } from './monitor.ts';
+import { needsReview } from './publish.ts';
 
 let running = 0;
 
@@ -58,8 +59,8 @@ async function processOne(): Promise<boolean> {
     await publishPhoto(next.id, analysis.faces);
 
     const insert = db.prepare(
-      `INSERT INTO observations (photo_id, store_id, item_slug, raw_name, variety, price, unit, confidence, price_box, product_box, observed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO observations (photo_id, store_id, item_slug, raw_name, variety, price, unit, confidence, price_box, product_box, observed_at, hidden, review)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     );
     const created: { id: number; slug: string; box: ReturnType<typeof cropBox> }[] = [];
     db.transaction(() => {
@@ -67,10 +68,11 @@ async function processOne(): Promise<boolean> {
       for (const it of analysis.items) {
         const item = matchCatalog(it.name, it.variety);
         if (!item || it.price === null || it.price < 100) continue;
+        const hold = needsReview(it) ? 1 : 0;
         const row = insert.get(
           next.id, next.store_id, item.slug, it.name, it.variety, it.price, it.unit, it.confidence,
           it.price_box ? JSON.stringify(it.price_box) : null, it.product_box ? JSON.stringify(it.product_box) : null,
-          next.taken_at,
+          next.taken_at, hold, hold,
         ) as { id: number };
         created.push({ id: row.id, slug: item.slug, box: cropBox(it.price_box, it.product_box) });
       }

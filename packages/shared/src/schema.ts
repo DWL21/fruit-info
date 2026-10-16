@@ -20,6 +20,10 @@ export const AnalysisItem = z.object({
   confidence: z.number().min(0).max(1).catch(0.5),
   price_box: nullableBox,
   product_box: nullableBox,
+  /** 품목명을 가격표 글자에서 읽었는지(tag), 진열 상품 외형으로 판단했는지(product) */
+  name_source: z.enum(['tag', 'product']).catch('product'),
+  /** 진열 상품 외형 근거 (예: '흰 그물망에 싸인 연두색 둥근 과일') */
+  product_desc: z.string().max(80).catch(''),
 });
 export type AnalysisItem = z.infer<typeof AnalysisItem>;
 
@@ -73,6 +77,8 @@ export const Observation = z.object({
   price: z.number(),
   unit: z.string().nullable(),
   confidence: z.number(),
+  /** 운영자 확인 대기 (관리 화면에만 보임) */
+  review: z.boolean().optional(),
   photoId: z.string(),
   photoUrl: z.string(),
   cropUrl: z.string().nullable(),
@@ -116,6 +122,7 @@ export type Photo = z.infer<typeof Photo>;
 
 export const ObservationPatch = z.object({
   hidden: z.boolean().optional(),
+  review: z.boolean().optional(),
   itemSlug: z.string().optional(),
   price: z.number().int().min(100).max(10_000_000).optional(),
   unit: z.string().trim().max(20).nullable().optional(),
