@@ -75,10 +75,14 @@ export function WalkGuide({ stores, marks, sticky = false, initialSegment }: { s
     return sticky ? hh + headH + 12 : hh + 12;
   }, [sticky, headH]);
 
+  /** 미니맵을 눌러 이동하는 동안은 스크롤 위치로 구간을 바꾸지 않는다(중간 구간이 차례로 깜빡이지 않게) */
+  const jumping = useRef<number | null>(null);
+
   useEffect(() => {
     if (!sticky) return;
     let raf = 0;
     const onScroll = () => {
+      if (jumping.current !== null) return;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const y = line();
@@ -104,8 +108,18 @@ export function WalkGuide({ stores, marks, sticky = false, initialSegment }: { s
       const near = [...segments].sort((a, b) => Math.abs(a.i - i) - Math.abs(b.i - i))[0];
       const el = refs.current.get(i) ?? (near ? refs.current.get(near.i) : undefined);
       if (!el) return;
+      const target = refs.current.has(i) ? i : (near?.i ?? i);
+      setActive(target);
+      if (jumping.current !== null) window.clearTimeout(jumping.current);
+      const release = () => {
+        if (jumping.current !== null) window.clearTimeout(jumping.current);
+        jumping.current = null;
+        window.removeEventListener('scrollend', release);
+      };
+      jumping.current = window.setTimeout(release, 1200);
+      window.addEventListener('scrollend', release, { once: true });
       window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - line() + 4, behavior: smooth ? 'smooth' : 'auto' });
-      setActive(refs.current.has(i) ? i : (near?.i ?? i));
+      if (!smooth) release();
     },
     [segments, line],
   );
