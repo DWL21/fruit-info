@@ -263,7 +263,10 @@ function Shooter() {
               <span className="block text-[11px] text-white/60">
                 {list.indexOf(current) + 1}/{list.length} · {placeName(current)}
               </span>
-              <span className="block truncate text-lg font-bold">{current.name}</span>
+              <span className="block truncate text-lg font-bold">
+                {current.name}
+                {current.stallNo && <span className="ml-1.5 text-sm font-bold text-amber">{current.stallNo}</span>}
+              </span>
             </>
           ) : (
             <span className="font-semibold">가게를 먼저 등록하세요</span>
@@ -334,22 +337,25 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const term = q.replace(/\s/g, '');
-  const shown = stores.map((s, i) => ({ s, i })).filter(({ s }) => !term || `${s.name}${s.address ?? ''}`.replace(/\s/g, '').includes(term));
+  // 상호명이 먼저, 점포 번호(예: 120, 가-10)로도 찾는다.
+  const shown = stores
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => !term || s.name.replace(/\s/g, '').includes(term) || (s.stallNo ?? '').replace(/[-호]/g, '').includes(term.replace(/[-호]/g, '')));
   const currentRef = useRef<HTMLLIElement>(null);
   useEffect(() => {
     currentRef.current?.scrollIntoView({ block: 'center' });
   }, []);
   const [editing, setEditing] = useState<Store | null>(null);
-  const [form, setForm] = useState({ name: '', aisle: 'main' as Aisle, position: 0, side: 'A' as Side });
+  const [form, setForm] = useState({ name: '', stallNo: '', aisle: 'main' as Aisle, position: 0, side: 'A' as Side });
   useEffect(() => {
-    if (editing) setForm({ name: editing.name, aisle: editing.aisle, position: editing.position, side: editing.side });
+    if (editing) setForm({ name: editing.name, stallNo: editing.stallNo ?? '', aisle: editing.aisle, position: editing.position, side: editing.side });
   }, [editing]);
   const save = useMutation({
     mutationFn: () => (editing ? adminApi.updateStore(editing.id, form) : adminApi.createStore(form)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['stores'] });
       setEditing(null);
-      setForm((f) => ({ ...f, name: '' }));
+      setForm((f) => ({ ...f, name: '', stallNo: '' }));
     },
   });
   const remove = useMutation({
@@ -361,7 +367,7 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
     <Sheet title="가게 선택·관리" onClose={onClose}>
       <label className="sticky -top-4 z-10 -mx-4 mb-3 block bg-canvas px-4 py-2">
         <span className="sr-only">가게 검색</span>
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="가게 이름·주소" className="field min-h-11 w-full px-3" />
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="상호명 또는 점포 번호" className="field min-h-11 w-full px-3" />
       </label>
       <ul className="space-y-2">
         {shown.map(({ s, i }) => (
@@ -370,6 +376,7 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
               <span className="block font-semibold">
                 <span className="mr-1 text-xs text-chrome num">{i + 1}</span>
                 {s.name}
+                {s.stallNo && <span className="chip-amber ml-1.5 px-1 text-[11px]">{s.stallNo}</span>}
               </span>
               <span className="text-xs text-chrome">
                 {placeName(s)} · {s.lastPhotoAt ? `${timeAgo(s.lastPhotoAt)} 촬영` : '촬영 기록 없음'}
@@ -391,6 +398,10 @@ function StoresPanel({ stores, currentId, onPick, onClose }: { stores: Store[]; 
         <label className="block text-sm">
           가게 이름 (간판)
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className="mt-1 min-h-11 w-full rounded-lg border border-chrome px-3" />
+        </label>
+        <label className="block text-sm">
+          점포 번호
+          <input value={form.stallNo} onChange={(e) => setForm({ ...form, stallNo: e.target.value })} placeholder="예: 120호, 가-10호" className="mt-1 min-h-11 w-full rounded-lg border border-chrome px-3" />
         </label>
         <fieldset className="text-sm">
           <legend>통로</legend>
@@ -494,7 +505,8 @@ function PhotoReview({ id, stores, storeId }: { id: string; stores: Store[]; sto
         <select value={storeId} onChange={(e) => move.mutate(Number(e.target.value))} className="field mt-1 block min-h-11 w-full px-2 text-sm">
           {stores.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name} · {s.address ?? placeName(s)}
+              {s.name}
+              {s.stallNo ? ` · ${s.stallNo}` : ''}
             </option>
           ))}
         </select>

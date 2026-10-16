@@ -47,6 +47,8 @@ export const Store = z.object({
   position: z.number(),
   side: Side,
   address: z.string().nullable(),
+  /** 점포 번호 (예: 120호, 가-10호) */
+  stallNo: z.string().nullable(),
   note: z.string().nullable(),
   itemCount: z.number(),
   lastPhotoAt: z.string().nullable(),
@@ -59,6 +61,7 @@ export const StoreInput = z.object({
   position: z.number().int().min(0).max(500),
   side: Side,
   address: z.string().trim().max(60).nullable().optional(),
+  stallNo: z.string().trim().max(20).nullable().optional(),
   note: z.string().trim().max(80).nullable().optional(),
 });
 export type StoreInput = z.infer<typeof StoreInput>;

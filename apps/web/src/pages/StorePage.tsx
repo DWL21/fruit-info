@@ -25,7 +25,7 @@ export function StorePage({ id }: { id: number }) {
         <Link href={`/map?seg=${segmentIndex(store) + 1}`} className="text-sm font-bold text-carbon">‹ 시장 지도</Link>
         <h1 className="display-outline mt-1 text-[28px]">{store.name}</h1>
         <p className="mt-1 text-sm font-bold text-carbon">
-          {[`구간 ${segmentIndex(store) + 1}`, placeName(store), store.address].filter(Boolean).join(' · ')}
+          {[store.stallNo, `구간 ${segmentIndex(store) + 1}`, placeName(store), store.address].filter(Boolean).join(' · ')}
           {store.note && ` · ${store.note}`}
         </p>
         {store.lastPhotoAt && <p className="text-xs font-bold text-chrome">마지막 촬영 {timeAgo(store.lastPhotoAt)}</p>}

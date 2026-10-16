@@ -15,15 +15,21 @@ export function seedStores() {
   const byKakao = db.prepare('SELECT id FROM stores WHERE kakao_id = ?').pluck();
   const byName = db.prepare('SELECT id FROM stores WHERE kakao_id IS NULL AND name = ? AND active = 1').pluck();
   const attach = db.prepare('UPDATE stores SET kakao_id = ?, address = ?, aisle = ?, position = ?, side = ?, lat = ?, lon = ? WHERE id = ?');
-  const insert = db.prepare('INSERT INTO stores (kakao_id, name, address, aisle, position, side, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  const insert = db.prepare('INSERT INTO stores (kakao_id, name, address, aisle, position, side, lat, lon, stall_no) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  // 점포 번호는 나중에 조사해 추가되므로 비어 있는 가게에만 채운다.
+  const fillNo = db.prepare('UPDATE stores SET stall_no = ? WHERE kakao_id = ? AND stall_no IS NULL');
   let added = 0;
   db.transaction(() => {
     for (const line of lines) {
-      const [kakaoId, name, address, aisle, position, side, lat, lon] = line.split('\t');
-      if (!kakaoId || !name || byKakao.get(kakaoId)) continue;
+      const [kakaoId, name, address, aisle, position, side, lat, lon, stallNo] = line.split('\t');
+      if (!kakaoId || !name) continue;
+      if (byKakao.get(kakaoId)) {
+        if (stallNo) fillNo.run(stallNo, kakaoId);
+        continue;
+      }
       const existing = byName.get(name) as number | undefined;
       if (existing) attach.run(kakaoId, address, aisle, Number(position), side, Number(lat), Number(lon), existing);
-      else insert.run(kakaoId, name, address, aisle, Number(position), side, Number(lat), Number(lon));
+      else insert.run(kakaoId, name, address, aisle, Number(position), side, Number(lat), Number(lon), stallNo || null);
       added++;
     }
   })();
