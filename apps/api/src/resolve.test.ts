@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 process.env.DATA_DIR = mkdtempSync(join(tmpdir(), 'fruit-resolve-'));
 const { db } = await import('./db.ts');
-const { resolveStore, isInvalid } = await import('./queue.ts');
+const { resolveStore, isInvalid, limitResetAt } = await import('./queue.ts');
 
 let ids: Record<string, number> = {};
 beforeAll(() => {
@@ -58,5 +58,22 @@ describe('isInvalid', () => {
     expect(isInvalid({ stall_photo: false }, 0)).toBe(true);
     expect(isInvalid({ stall_photo: false }, 2)).toBe(false);
     expect(isInvalid({ stall_photo: true }, 0)).toBe(false);
+  });
+});
+
+describe('limitResetAt', () => {
+  const now = new Date(2026, 9, 16, 11, 41).getTime();
+  it('사용량 한도 메시지의 시각까지', () => {
+    const t = limitResetAt("You've hit your usage limit. … try again at 1:24 PM.", now)!;
+    expect(new Date(t).getHours()).toBe(13);
+    expect(new Date(t).getMinutes()).toBe(25);
+  });
+  it('이미 지난 시각이면 다음 날', () => {
+    const t = limitResetAt('usage limit … try again at 9:00 AM', now)!;
+    expect(t - now).toBeGreaterThan(20 * 3600_000);
+  });
+  it('시각이 없으면 30분 뒤, 한도 오류가 아니면 null', () => {
+    expect(limitResetAt('usage limit reached', now)).toBe(now + 30 * 60_000);
+    expect(limitResetAt('분석기 응답 없음 (exit 1) timeout', now)).toBeNull();
   });
 });

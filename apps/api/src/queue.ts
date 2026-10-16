@@ -55,8 +55,27 @@ function emitPhoto(id: string) {
   if (!isSample(id)) live.publish({ type: 'feed', photoId: id });
 }
 
+/** 분석기 사용량 한도에 걸리면 풀릴 때까지 큐를 멈춘다. */
+let pausedUntil = 0;
+export const queuePausedUntil = () => (pausedUntil > Date.now() ? new Date(pausedUntil).toISOString() : null);
+
+/** 'usage limit … try again at 1:24 PM' → 다시 시도할 시각(ms). 한도 오류가 아니면 null. */
+export function limitResetAt(message: string, nowMs = Date.now()): number | null {
+  if (!/usage limit|rate limit/i.test(message)) return null;
+  const m = message.match(/try again at (\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!m) return nowMs + 30 * 60_000;
+  const n = Number(m[1]);
+  const h = m[3] ? (n % 12) + (m[3].toUpperCase() === 'PM' ? 12 : 0) : n;
+  const d = new Date(nowMs);
+  d.setHours(h, Number(m[2]), 0, 0);
+  let t = d.getTime();
+  if (t <= nowMs) t += 86_400_000;
+  return t + 60_000;
+}
+
 /** 큐에서 사진 하나를 꺼내 분석·게시한다. */
 async function processOne(): Promise<boolean> {
+  if (pausedUntil > Date.now()) return false;
   const next = db
     .prepare(
       `UPDATE photos SET status = 'analyzing', attempts = attempts + 1
@@ -117,6 +136,15 @@ async function processOne(): Promise<boolean> {
     const message = error instanceof Error ? error.message : String(error);
     const row = db.prepare('SELECT attempts FROM photos WHERE id = ?').get(next.id) as { attempts: number } | undefined;
     if (!row) return true;
+    const reset = limitResetAt(message);
+    if (reset) {
+      // 사진 탓이 아니므로 시도 횟수를 되돌리고 한도가 풀리면 다시 분석한다.
+      pausedUntil = Math.max(pausedUntil, reset);
+      db.prepare(`UPDATE photos SET status = 'queued', attempts = attempts - 1, error = NULL WHERE id = ?`).run(next.id);
+      console.warn(`[analyze] 분석기 사용량 한도, ${new Date(pausedUntil).toISOString()}까지 멈춤`);
+      emitPhoto(next.id);
+      return false;
+    }
     const attempts = row.attempts;
     // 두 번까지 다시 시도한다.
     db.prepare(`UPDATE photos SET status = ?, error = ? WHERE id = ?`).run(attempts < 3 ? 'queued' : 'failed', message.slice(0, 300), next.id);
