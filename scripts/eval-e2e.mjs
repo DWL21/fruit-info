@@ -3,6 +3,8 @@
 // 평가용 사진은 공개 화면(피드·시세·지도)에 나오지 않는다.
 //
 //   API=http://127.0.0.1:8081 UPLOAD_KEY=... node scripts/eval-e2e.mjs apps/api/eval/e2e.json [보고서.md]
+//   DECOY=1  일부러 다른 가게를 고른 채 올려 간판 인식만으로 옮겨지는지 본다 (기본: 촬영 모드처럼 정답 가게를 골라 올림)
+//   PUBLIC=1 평가용 표시 없이 올려 공개 화면에 게시한다
 //
 // 매니페스트: [{ id, url, store: "정답 가게 이름", stallNo?, prices?: [{ item, price }] }]
 import { readFile, writeFile } from 'node:fs/promises';
@@ -23,8 +25,10 @@ async function api(path, init = {}) {
 }
 
 const stores = await api('/api/stores');
-// 일부러 정답과 다른 가게를 고른 채 올려, 간판 인식으로 맞게 옮겨지는지 본다.
+const DECOY = process.env.DECOY === '1';
+const PUBLIC = process.env.PUBLIC === '1';
 const decoy = stores[0];
+const storeFor = (s) => (DECOY ? decoy : stores.find((x) => norm(x.name) === norm(s.store)) ?? decoy);
 
 const results = [];
 const CONCURRENT_UPLOADS = 4;
@@ -36,9 +40,9 @@ for (let i = 0; i < samples.length; i += CONCURRENT_UPLOADS) {
         if (!img.ok) throw new Error(`이미지 ${img.status}`);
         const form = new FormData();
         form.set('photo', new File([await img.arrayBuffer()], 'p.jpg', { type: img.headers.get('content-type')?.startsWith('image/') ? img.headers.get('content-type') : 'image/jpeg' }));
-        form.set('storeId', String(decoy.id));
+        form.set('storeId', String(storeFor(s).id));
         form.set('autoStore', '1');
-        form.set('sample', '1');
+        if (!PUBLIC) form.set('sample', '1');
         const photo = await api('/api/admin/photos', { method: 'POST', body: form });
         results.push({ s, photoId: photo.id });
       } catch (e) {
@@ -113,7 +117,7 @@ const avg = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) /
 const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 const report = `# 실제 업로드 평가 ${today}
 
-운영 업로드 경로(간판 자동 배정 켬, 일부러 다른 가게 '${decoy.name}'를 고른 채 업로드, 평가용 표시로 공개 화면 제외). 사진 ${samples.length}장.
+운영 업로드 경로(간판 자동 배정 켬, ${DECOY ? `일부러 다른 가게 '${decoy.name}'를 고른 채 업로드` : '정답 가게를 고른 채 업로드'}, ${PUBLIC ? '공개 게시' : '평가용 표시로 공개 화면 제외'}). 사진 ${samples.length}장.
 
 | 지표 | 값 |
 |---|---|

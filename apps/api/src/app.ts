@@ -85,7 +85,7 @@ app.get('/api/stores/:id', (c) => {
     data: {
       store,
       observations: repo.currentObservations({ storeId: store.id }),
-      photos: repo.listPhotos({ storeId: store.id, status: 'done', limit: 12, publicOnly: true }),
+      photos: repo.listPhotos({ storeId: store.id, status: 'done', limit: 12, publicOnly: true, hideHeld: true }),
     },
   });
 });
@@ -220,12 +220,18 @@ admin.get('/photos/:id', (c) => {
   if (!photo) return fail(c, 404, 'not_found', '없는 사진입니다.');
   return c.json({ data: { photo, observations: repo.photoObservations(photo.id, true) } });
 });
-// 사진을 다른 가게로 옮긴다(간판 인식이 틀렸거나 수동으로 고칠 때).
+// 사진을 다른 가게로 옮기거나(간판 인식이 틀렸을 때), 보류를 풀어 게시한다.
 admin.patch('/photos/:id', async (c) => {
-  const body = (await c.req.json().catch(() => null)) as { storeId?: number } | null;
+  const body = (await c.req.json().catch(() => null)) as { storeId?: number; held?: boolean } | null;
+  const id = c.req.param('id');
+  if (typeof body?.held === 'boolean' && body.storeId === undefined) {
+    const r = db.prepare('UPDATE photos SET held = ? WHERE id = ?').run(Number(body.held), id);
+    if (!r.changes) return fail(c, 404, 'not_found', '없는 사진입니다.');
+    if (!repo.isSample(id)) live.publish({ type: 'feed', photoId: id });
+    return c.json({ data: repo.getPhoto(id) });
+  }
   const storeId = Number(body?.storeId);
   if (!repo.getStore(storeId)) return fail(c, 400, 'invalid', '가게를 선택하세요.');
-  const id = c.req.param('id');
   const before = db.prepare('SELECT store_id FROM photos WHERE id = ?').get(id) as { store_id: number } | undefined;
   if (!before) return fail(c, 404, 'not_found', '없는 사진입니다.');
   db.transaction(() => {

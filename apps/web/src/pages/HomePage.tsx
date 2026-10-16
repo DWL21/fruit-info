@@ -36,7 +36,7 @@ export function HomePage() {
                   {i.cropUrl ? <img src={i.cropUrl} alt="" className="size-full rounded-full object-cover" /> : <span className="flex size-full items-center justify-center text-2xl">{i.emoji}</span>}
                 </span>
                 <span className="w-full truncate text-center text-[11px] font-bold leading-tight">{i.emoji} {i.name}</span>
-                <span className="num w-full truncate text-center text-[11px] font-black leading-none">{won(i.minPrice)}</span>
+                <span className="num w-full truncate text-center text-[11px] font-black leading-none">{won(i.minPrice)}~</span>
               </Link>
             </li>
           ))}

@@ -583,7 +583,7 @@ function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClo
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{p.storeName}</span>
                 <span className="block text-xs text-chrome">
-                  {timeAgo(p.takenAt)} · {statusLabel[p.status]}
+                  {timeAgo(p.takenAt)} · {p.held ? <b className="text-[#c25f00]">보류</b> : statusLabel[p.status]}
                   {p.status === 'done' && ` · 시세 ${p.itemCount}개`}
                   {p.reviewCount > 0 && <span className="font-bold text-[#c25f00]"> · 확인 대기 {p.reviewCount}</span>}
                   {p.durationMs && ` · ${Math.round(p.durationMs / 1000)}초`}
@@ -594,7 +594,7 @@ function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClo
                 {p.error && <span className="block truncate text-xs text-red-600">{p.error}</span>}
               </span>
             </button>
-            {open === p.id && !selecting && <PhotoReview id={p.id} stores={stores} storeId={p.storeId} onDelete={() => ask([p.id])} />}
+            {open === p.id && !selecting && <PhotoReview id={p.id} stores={stores} storeId={p.storeId} held={p.held} onDelete={() => ask([p.id])} />}
           </li>
         ))}
       </ul>
@@ -602,7 +602,7 @@ function ResultsPanel({ initialOpen, stores, photos, jobs, retry, discard, onClo
   );
 }
 
-function PhotoReview({ id, stores, storeId, onDelete }: { id: string; stores: Store[]; storeId: number; onDelete: () => void }) {
+function PhotoReview({ id, stores, storeId, held, onDelete }: { id: string; stores: Store[]; storeId: number; held: boolean; onDelete: () => void }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['admin-photo', id], queryFn: () => adminApi.photo(id) });
   const patch = useMutation({
@@ -610,6 +610,7 @@ function PhotoReview({ id, stores, storeId, onDelete }: { id: string; stores: St
     onSuccess: () => void qc.invalidateQueries(),
   });
   const reanalyze = useMutation({ mutationFn: () => adminApi.reanalyze(id), onSuccess: () => void qc.invalidateQueries() });
+  const hold = useMutation({ mutationFn: (h: boolean) => adminApi.setHeld(id, h), onSuccess: () => void qc.invalidateQueries() });
   const removeObs = useMutation({ mutationFn: (obsId: number) => adminApi.deleteObservations([obsId]), onSuccess: () => void qc.invalidateQueries() });
   const move = useMutation({ mutationFn: (sid: number) => adminApi.moveStore(id, sid), onSuccess: () => void qc.invalidateQueries() });
   if (!q.data) return <p className="p-3 text-sm text-chrome">불러오는 중…</p>;
@@ -662,6 +663,9 @@ function PhotoReview({ id, stores, storeId, onDelete }: { id: string; stores: St
         ))}
       </ul>
       <div className="mt-3 flex gap-2">
+        <button onClick={() => hold.mutate(!held)} disabled={hold.isPending} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${held ? 'btn-signal' : 'ring-1 ring-chrome'}`}>
+          {held ? '게시' : '보류'}
+        </button>
         <button onClick={() => reanalyze.mutate()} disabled={reanalyze.isPending} className="min-h-11 flex-1 rounded-lg bg-platinum text-sm font-semibold">
           다시 분석
         </button>

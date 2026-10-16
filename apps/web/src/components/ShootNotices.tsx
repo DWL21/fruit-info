@@ -13,6 +13,7 @@ const norm = (s: string | null) => (s ?? '').replace(/\s/g, '');
 export function problemsOf(photo: Photo, autoStore: boolean): string[] {
   if (photo.status === 'failed') return [`분석 실패${photo.error ? ` · ${photo.error}` : ''}`];
   const out: string[] = [];
+  if (photo.held) out.push('매대 사진이 아니어서 보류');
   if (autoStore && !photo.readStoreName) out.push(`간판 인식 실패 · ${photo.storeName}로 배정`);
   if (photo.readStoreName && norm(photo.readStoreName) !== norm(photo.storeName)) out.push(`간판 '${photo.readStoreName}' ≠ ${photo.storeName}`);
   if (photo.itemCount === 0 && photo.reviewCount === 0) out.push('읽은 시세 없음');

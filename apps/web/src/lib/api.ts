@@ -79,6 +79,7 @@ export const adminApi = {
     if (autoStore) form.set('autoStore', '1');
     return request<Photo>('/api/admin/photos', adminInit({ method: 'POST', body: form }));
   },
+  setHeld: (id: string, held: boolean) => request<Photo>(`/api/admin/photos/${id}`, jsonInit('PATCH', { held })),
   moveStore: (id: string, storeId: number) => request<Photo>(`/api/admin/photos/${id}`, jsonInit('PATCH', { storeId })),
   deletePhotos: (ids: string[]) => request<{ deleted: string[]; skipped: string[] }>('/api/admin/photos/delete', jsonInit('POST', { ids })),
   deleteObservations: (ids: number[]) => request<{ deleted: number }>('/api/admin/observations/delete', jsonInit('POST', { ids })),

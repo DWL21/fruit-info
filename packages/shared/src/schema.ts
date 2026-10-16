@@ -29,6 +29,8 @@ export type AnalysisItem = z.infer<typeof AnalysisItem>;
 
 export const Analysis = z.object({
   store_name: z.string().max(40).nullable().catch(null),
+  /** 가게 매대·진열 상품이 보이는 사진인지 (메뉴판만·먹는 사진·간판만이면 false) */
+  stall_photo: z.boolean().catch(true),
   items: z.array(AnalysisItem).max(40).catch([]),
   faces: z.array(Box).max(30).catch([]),
 });
@@ -122,6 +124,8 @@ export const Photo = z.object({
   error: z.string().nullable(),
   durationMs: z.number().nullable(),
   takenAt: z.string(),
+  /** 매대 사진이 아니고 시세도 없어 공개하지 않고 보류 중 */
+  held: z.boolean(),
 });
 export type Photo = z.infer<typeof Photo>;
 
