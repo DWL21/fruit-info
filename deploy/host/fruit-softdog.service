@@ -1,0 +1,16 @@
+# 하드웨어 워치독이 없는 KVM이라 소프트웨어 워치독(softdog)을 올린다.
+# Ubuntu는 softdog를 블랙리스트에 올려 두어 modules-load.d로는 로드되지 않으므로
+# modprobe로 직접 올리고, systemd가 /dev/watchdog를 다시 열도록 타임아웃을 다시 설정한다.
+# 설치 위치: /etc/systemd/system/fruit-softdog.service
+[Unit]
+Description=Load softdog and arm systemd runtime watchdog
+After=dbus.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/modprobe softdog
+ExecStartPost=/usr/bin/busctl set-property org.freedesktop.systemd1 /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager RuntimeWatchdogUSec t 60000000
+
+[Install]
+WantedBy=multi-user.target
